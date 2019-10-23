@@ -70,19 +70,19 @@ def check_request_status(r):
 
 def register(args):
     print(":: calling register..")
-    r = req("request", {"token": args.token})
+    r = req("register", {"token": args.token})
     check_request_status(r)
     print(r.text)
 
 def check(args):
     print(":: calling check..")
-    r = req("status", {"token": args.token})
+    r = req("check", {"token": args.token})
     check_request_status(r)
     print(r.text)
 
 def claim(args):
     print(":: calling claim..")
-    r = req("status", {"token": args.token, "secret": args.secret, "address": args.address})
+    r = req("claim", {"token": args.token, "secret": args.secret, "address": args.address})
     check_request_status(r)
     print(r.text)
 

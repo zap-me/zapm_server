@@ -21,7 +21,7 @@ class ClaimCode(Base):
     id = Column(Integer, primary_key=True)
     date = Column(Float, nullable=False)
     token = Column(String, nullable=False, unique=True)
-    secret = Column(String, nullable=False)
+    secret = Column(String)
     address = Column(String)
     status = Column(String)
 
