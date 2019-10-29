@@ -28,6 +28,18 @@ def hello():
     return "boo"
 
 #
+# Test
+#
+
+@app.route("/test/<token>")
+def test(token):
+    #TODO: only allow when test environment var is present 
+    claim_code = ClaimCode.from_token(db_session, token)
+    if claim_code:
+        return jsonify(claim_code.to_json())
+    return abort(404)
+
+#
 # Private (merchant) API
 #
 
