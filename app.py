@@ -62,6 +62,7 @@ def load_user(user_id):
 ### This BLOCK is to show the the tables as TABS
 class users(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, nullable=False)
     username = db.Column(db.String)
     email = db.Column(db.String)
     password = db.Column(db.String)
