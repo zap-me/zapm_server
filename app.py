@@ -29,12 +29,9 @@ if os.getenv("DATABASE_URL"):
     db_url = os.getenv("DATABASE_URL")
 else:
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    #db_url = "sqlite:///%s/zapm-test.db" % dir_path
     db_url = "sqlite:///zapm-test.db" % dir_path
 
 
-
-#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zapm-test.db'
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SECRET_KEY'] = 'c#X&bvhr7zPHFNO2V&cuw7QziCOJ%NPNyJOIS02TFq&*S7HXA57q%Smhleh2zPyv'
 
@@ -111,7 +108,6 @@ class protected_users_views(ModelView):
         return redirect(url_for('login'))
 
 class protectedAdminIndexView(AdminIndexView):
-    #form_base_class = flask_wtf.Form ###Not Working
     def is_accessible(self):
         return current_user.is_authenticated
 
