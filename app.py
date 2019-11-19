@@ -62,10 +62,10 @@ def load_user(user_id):
 ### This BLOCK is to show the the tables as TABS
 class users(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(100))
-    email = db.Column(db.String(100))
-    password = db.Column(db.String(100))
-    wallet_address = db.Column(db.String(32))
+    username = db.Column(db.String)
+    email = db.Column(db.String)
+    password = db.Column(db.String)
+    wallet_address = db.Column(db.String)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password, method='sha256')
@@ -75,11 +75,11 @@ class users(db.Model, UserMixin):
 
 class claim_codes(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Float)
-    token = db.Column(db.String(100))
-    secret = db.Column(db.String(100))
-    address = db.Column(db.String(100))
-    status = db.Column(db.String(100))
+    date = db.Column(db.Float, nullable=False)
+    token = db.Column(db.String)
+    secret = db.Column(db.String)
+    address = db.Column(db.String)
+    status = db.Column(db.String)
 
 ### Protect claim_codes view from viewing normally.
 class protected_claim_codes_views(ModelView):
