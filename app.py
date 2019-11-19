@@ -29,7 +29,7 @@ if os.getenv("DATABASE_URL"):
     db_url = os.getenv("DATABASE_URL")
 else:
     dir_path = os.path.dirname(os.path.realpath(__file__))
-    db_url = "sqlite:///zapm-test.db" % dir_path
+    db_url = "sqlite:///%s/zapm-test.db" % dir_path
 
 
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
