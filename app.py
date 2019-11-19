@@ -4,14 +4,44 @@ import logging
 import time
 import sys
 
-from flask import Flask, request, jsonify, abort
+from flask import Flask, request, jsonify, abort, redirect, url_for, render_template, session, flash
+from flask_sqlalchemy import SQLAlchemy
+from flask_admin import Admin, AdminIndexView
+from flask_admin.contrib.sqla import ModelView
+from flask_admin.menu import MenuLink
+from flask_login import UserMixin, LoginManager, current_user, login_user, logout_user
+#from flask_wtf import FlaskForm ### May not be needed
+from wtforms import StringField, PasswordField, BooleanField
+from wtforms.validators import InputRequired, Email, Length
+from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import db_session, init_db
 from models import ClaimCode
+import os
+###
+
 
 init_db()
 logger = logging.getLogger(__name__)
 app = Flask(__name__)
+
+if os.getenv("DATABASE_URL"):
+    db_url = os.getenv("DATABASE_URL")
+else:
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    #db_url = "sqlite:///%s/zapm-test.db" % dir_path
+    db_url = "sqlite:///zapm-test.db" % dir_path
+
+
+
+#app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///zapm-test.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+app.config['SECRET_KEY'] = 'c#X&bvhr7zPHFNO2V&cuw7QziCOJ%NPNyJOIS02TFq&*S7HXA57q%Smhleh2zPyv'
+
+
+db = SQLAlchemy(app)
+login = LoginManager(app)
+
 
 def setup_logging(level):
     # setup logging
@@ -23,9 +53,85 @@ def setup_logging(level):
     # clear loggers set by any imported modules
     logging.getLogger().handlers.clear()
 
-@app.route("/")
-def hello():
-    return "boo"
+
+#### load user function for authentication
+@login.user_loader
+def load_user(user_id):
+    return users.query.get(user_id)
+
+### This BLOCK is to show the the tables as TABS
+class users(db.Model, UserMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100))
+    email = db.Column(db.String(100))
+    password = db.Column(db.String(100))
+    wallet_address = db.Column(db.String(32))
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password, method='sha256')
+
+    def check_password(self, password):
+        return check_password_hash(self.password, password)
+
+class claim_codes(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.Float)
+    token = db.Column(db.String(100))
+    secret = db.Column(db.String(100))
+    address = db.Column(db.String(100))
+    status = db.Column(db.String(100))
+
+### Protect claim_codes view from viewing normally.
+class protected_claim_codes_views(ModelView):
+    #form_base_class = flask_wtf.Form  ### NOt Working
+    can_delete = False                 ### CAN REMOVE ADMINS ACCESS TO DELETE ROWS
+    can_edit = False                   ### REMOVE OVERALL EDIT FUNCTION
+    column_exclude_list = ['secret']   ### CAN EXCLUDE COLUMNS FROM BEING DISPLAYED
+    #column_editable_list = ['address']   ### ONLY ALLOW CERTAIN COLUMNS TO BE EDITABLE
+    page_size = 50 
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    ### login when you havent login yet.
+    def inaccessible_callback(self, name, **kwargs):
+        flash('Login Required!!!')
+        return redirect(url_for('login'))
+
+### Change the view for users view
+class protected_users_views(ModelView):
+    #form_base_class = flask_wtf.Form ### Not Working
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    ### login when you havent login yet.
+    def inaccessible_callback(self, name, **kwargs):
+        #return redirect(url_for('login'))
+        flash('Login Required!!!')
+        return redirect(url_for('login'))
+
+class protectedAdminIndexView(AdminIndexView):
+    #form_base_class = flask_wtf.Form ###Not Working
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+    def inaccessible_callback(self, name, **kwargs):
+        flash('Login Required!!!')
+        return redirect(url_for('login'))
+
+#### Menu Links (TOP NAVIGATION BAR)
+class AuthenticatedMenuLink(MenuLink):
+    def is_accessible(self):
+        return current_user.is_authenticated
+
+class NotAuthenticatedMenuLink(MenuLink):
+    def is_accessible(self):
+        return not current_user.is_authenticated
+
+
+admin = Admin(app, template_mode='bootstrap3',index_view=protectedAdminIndexView())
+admin.add_view(protected_users_views(users, db.session))
+admin.add_view(protected_claim_codes_views(claim_codes, db.session))
+admin.add_link(AuthenticatedMenuLink(name='Logout', endpoint='logout'))
 
 #
 # Test
@@ -85,6 +191,44 @@ def claim():
         else:
             return abort(400, "already claimed")
     return abort(404)
+
+#
+# ADMIN API
+#
+
+@app.route('/')
+def index():
+    if current_user.is_authenticated:
+        return redirect(url_for('admin.index'))
+    return render_template('admin/login.html')
+
+@app.route('/login',methods = ['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'GET':
+        return render_template('admin/login.html')
+
+    username = request.form.get('username')
+    password = request.form.get('password')
+
+    registered_user = users.query.filter_by(username=username).first()  ###Look for the user in the users table in the db. Return the first user it sees.
+
+    ### POST SECTION OF THE LOGIN PAGE
+    if registered_user:
+        if registered_user.check_password(password=password):
+            login_user(registered_user)
+            return redirect(url_for('index'))
+
+    flash('Please check your login details and try again.')
+    return redirect(url_for('login'))
+
+@app.route('/logout')
+def logout():
+    logout_user()
+    flash('User has been logout')
+    return redirect(url_for('index'))
 
 if __name__ == "__main__":
     setup_logging(logging.DEBUG)
