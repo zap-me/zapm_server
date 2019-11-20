@@ -7,6 +7,7 @@ from flask_admin.contrib import sqla
 from marshmallow import Schema, fields
 
 from app_core import app, db
+from utils import generate_key
 
 # Define models
 roles_users = db.Table(
@@ -49,19 +50,8 @@ class User(db.Model, UserMixin):
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
-# Create customized model view class
-class RestrictedModelView(sqla.ModelView):
-    can_create = False
-    can_delete = False
-    can_edit = False
-    column_exclude_list = ['password', 'secret']
-
-    def is_accessible(self):
-        return (current_user.is_active and
-                current_user.is_authenticated and
-                current_user.has_role('admin')
-        )
-
+# Create customized model view classes
+class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
         """
         Override builtin _handle_view in order to redirect users when a view is not accessible.
@@ -73,6 +63,42 @@ class RestrictedModelView(sqla.ModelView):
             else:
                 # login
                 return redirect(url_for('security.login', next=request.url))
+
+class RestrictedModelView(BaseModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    column_exclude_list = ['password', 'secret']
+
+    def is_accessible(self):
+        return (current_user.is_active and
+                current_user.is_authenticated and
+                current_user.has_role('admin')
+        )
+
+class UserModelView(BaseModelView):
+    can_create = True
+    can_delete = True
+    can_edit = False
+    column_exclude_list = ['password']
+
+    def is_accessible(self):
+        return (current_user.is_active and
+                current_user.is_authenticated
+        )
+
+class ApiKeyModelView(UserModelView):
+    form_excluded_columns = ['user', 'date', 'token', 'secret']
+
+    def get_query(self):
+        return self.session.query(self.model).filter(self.model.user==current_user)
+
+    def get_count_query(self):
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.generate_defaults()
 
 class ClaimCodeSchema(Schema):
     date = fields.Float()
@@ -110,3 +136,33 @@ class ClaimCode(db.Model):
     def to_json(self):
         schema = ClaimCodeSchema()
         return schema.dump(self).data
+
+class ApiKey(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('apikeys', lazy='dynamic'))
+    date = db.Column(db.DateTime(), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    token = db.Column(db.String(255), unique=True, nullable=False)
+    secret = db.Column(db.String(255), nullable=False)
+
+    def __init__(self, name):
+        self.name = name
+        self.generate_defaults()
+
+    def generate_defaults(self):
+        self.user = current_user
+        self.date = datetime.datetime.now()
+        self.token = generate_key(8)
+        self.secret = generate_key(16)
+
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
+
+    @classmethod
+    def from_token(cls, session, token):
+        return session.query(cls).filter(cls.token == token).first()
+
+    def __repr__(self):
+        return "<ApiKey %r>" % (self.token)
