@@ -116,7 +116,7 @@ def check():
     if not res:
         return abort(400, reason)
     claim_code = ClaimCode.from_token(db.session, token)
-    if claim_code:
+    if claim_code and claim_code.user == api_key.user:
         return jsonify(claim_code.to_json())
     return abort(404)
 
