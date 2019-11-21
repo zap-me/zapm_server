@@ -7,8 +7,9 @@ from flask import url_for, redirect, render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
 
 from app_core import app, db
-from models import security, user_datastore, Role, User, ClaimCode
+from models import security, user_datastore, Role, User, ClaimCode, ApiKey
 import admin
+from utils import check_hmac_auth
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,11 @@ def add_user(email, password):
     with app.app_context():
         user = User.from_email(db.session, email)
         if user:
-            logger.error('user already exists')
-            return
-        user = user_datastore.create_user(email=email, password=encrypt_password(password))
+            #logger.error('user already exists')
+            #return
+            user.password = encrypt_password(password)
+        else:
+            user = user_datastore.create_user(email=email, password=encrypt_password(password))
         db.session.commit()
 
 def add_role(email, role_name):
@@ -76,21 +79,42 @@ def test(token):
 # Private (merchant) API
 #
 
+def check_auth(api_key_token, nonce, sig, body):
+    api_key = ApiKey.from_token(db.session, api_key_token)
+    if not api_key:
+        return False, "not found", None
+    res, reason = check_hmac_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return False, reason, None
+    # update api key nonce
+    db.session.commit()
+    return True, "", api_key
+
 @app.route("/register", methods=["POST"])
 def register():
-    #TODO: add AUTH
+    sig = request.headers.get('X-Signature')
     content = request.json
-    token = content["token"]
-    claim_code = ClaimCode(token)
+    api_key = content['api_key']
+    nonce = content['nonce']
+    token = content['token']
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    claim_code = ClaimCode(api_key.user, token)
     db.session.add(claim_code)
     db.session.commit()
     return jsonify(claim_code.to_json())
 
 @app.route("/check", methods=["POST"])
 def check():
-    #TODO: add AUTH
+    sig = request.headers.get('X-Signature')
     content = request.json
-    token = content["token"]
+    api_key = content['api_key']
+    nonce = content['nonce']
+    token = content['token']
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
     claim_code = ClaimCode.from_token(db.session, token)
     if claim_code:
         return jsonify(claim_code.to_json())

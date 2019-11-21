@@ -88,7 +88,7 @@ class UserModelView(BaseModelView):
         )
 
 class ApiKeyModelView(UserModelView):
-    form_excluded_columns = ['user', 'date', 'token', 'secret']
+    form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def get_query(self):
         return self.session.query(self.model).filter(self.model.user==current_user)
@@ -109,13 +109,16 @@ class ClaimCodeSchema(Schema):
 
 class ClaimCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('claimcodes', lazy='dynamic'))
     date = db.Column(db.DateTime())
     token = db.Column(db.String(255), unique=True, nullable=False)
     secret = db.Column(db.String(255))
     address = db.Column(db.String(255))
     status = db.Column(db.String(255))
 
-    def __init__(self, token):
+    def __init__(self, user, token):
+        self.user = user
         self.date = datetime.datetime.now()
         self.token = token
         self.secret = None
@@ -144,6 +147,7 @@ class ApiKey(db.Model):
     date = db.Column(db.DateTime(), nullable=False)
     name = db.Column(db.String(255), nullable=False)
     token = db.Column(db.String(255), unique=True, nullable=False)
+    nonce = db.Column(db.Integer, nullable=False)
     secret = db.Column(db.String(255), nullable=False)
 
     def __init__(self, name):
@@ -154,6 +158,7 @@ class ApiKey(db.Model):
         self.user = current_user
         self.date = datetime.datetime.now()
         self.token = generate_key(8)
+        self.nonce = 0
         self.secret = generate_key(16)
 
     @classmethod

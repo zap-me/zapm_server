@@ -4,10 +4,9 @@ import sys
 import argparse
 import requests
 import time
-import hmac
-import hashlib
-import base64
 import json
+
+from utils import create_hmac_sig
 
 URL_BASE = "http://localhost:5000/"
 
@@ -22,9 +21,13 @@ def construct_parser():
     ## Account / Device creation
 
     parser_register = subparsers.add_parser("register", help="Register a claim code")
+    parser_register.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_register.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
     parser_register.add_argument("token", metavar="TOKEN", type=str, help="the claim code token")
 
     parser_check = subparsers.add_parser("check", help="Check a claim code")
+    parser_check.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_check.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
     parser_check.add_argument("token", metavar="TOKEN", type=str, help="the claim code token")
 
     parser_claim = subparsers.add_parser("claim", help="Claim a claim code")
@@ -34,24 +37,18 @@ def construct_parser():
 
     return parser
 
-def create_sig(device_key, device_secret, message):
-    _hmac = hmac.new(device_secret.encode("latin-1"), msg=message.encode("latin-1"), digestmod=hashlib.sha256)
-    signature = _hmac.digest()
-    signature = base64.b64encode(signature).decode("utf-8")
-    return signature
-
-def req(endpoint, params=None, device_key=None, device_secret=None):
-    if device_key:
+def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
+    if api_key_token:
         if not params:
             params = {}
         params["nonce"] = int(time.time())
-        params["key"] = device_key
+        params["api_key"] = api_key_token
     url = URL_BASE + endpoint
     if params:
         headers = {"Content-type": "application/json"}
         body = json.dumps(params)
-        if device_key:
-            headers["X-Signature"] = create_sig(device_key, device_secret, body)
+        if api_key_token:
+            headers["X-Signature"] = create_hmac_sig(api_key_secret, body)
         print("   POST - " + url)
         r = requests.post(url, headers=headers, data=body)
     else:
@@ -70,13 +67,13 @@ def check_request_status(r):
 
 def register(args):
     print(":: calling register..")
-    r = req("register", {"token": args.token})
+    r = req("register", {"token": args.token}, args.api_key_token, args.api_key_secret)
     check_request_status(r)
     print(r.text)
 
 def check(args):
     print(":: calling check..")
-    r = req("check", {"token": args.token})
+    r = req("check", {"token": args.token}, args.api_key_token, args.api_key_secret)
     check_request_status(r)
     print(r.text)
 
