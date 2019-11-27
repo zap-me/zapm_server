@@ -1,3 +1,5 @@
+DEBUG = True
+
 # Create dummy secrey key so we can use sessions
 SECRET_KEY = '123456790'
 
@@ -21,6 +23,12 @@ SECURITY_POST_LOGOUT_VIEW = "/admin/"
 SECURITY_POST_REGISTER_VIEW = "/admin/"
 
 # Flask-Security features
+SECURITY_CONFIRMABLE = True
 SECURITY_REGISTERABLE = True
-SECURITY_SEND_REGISTER_EMAIL = False
+SECURITY_RECOVERABLE = True
+SECURITY_CHANGEABLE = True
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+# Flask-Mail config
+MAIL_SENDGRID_API_KEY = "XXXX"
+SECURITY_EMAIL_SENDER = "merchant@zap.me"

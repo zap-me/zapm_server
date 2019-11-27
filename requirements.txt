@@ -2,6 +2,7 @@ Flask==1.0.2
 Flask-Admin==1.5.4
 Flask-Security==1.7.5
 Flask-SQLAlchemy==2.4.1
+Flask-Mail-SendGrid==0.3
 marshmallow==2.15.3
 psycopg2-binary==2.8.1
 requests==2.20.0
