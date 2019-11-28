@@ -2,13 +2,16 @@
 
 import sys
 import argparse
-import requests
 import time
 import json
+
+import requests
+import socketio
 
 from utils import create_hmac_sig
 
 URL_BASE = "http://localhost:5000/"
+WS_URL = "ws://localhost:5000/"
 
 EXIT_NO_COMMAND = 1
 
@@ -18,7 +21,18 @@ def construct_parser():
 
     subparsers = parser.add_subparsers(dest="command")
 
-    ## Account / Device creation
+    ## Websocket
+
+    parser_ws = subparsers.add_parser("websocket", help="Listen to a websocket")
+    parser_ws.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_ws.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+
+    ## REST commands
+
+    parser_watch = subparsers.add_parser("watch", help="Watch an address")
+    parser_watch.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_watch.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+    parser_watch.add_argument("address", metavar="ADDR", type=str, help="the address to watch")
 
     parser_register = subparsers.add_parser("register", help="Register a claim code")
     parser_register.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
@@ -65,6 +79,40 @@ def check_request_status(r):
         print(r.text)
         raise e
 
+def websocket(args):
+    print(":: calling websocket..")
+    # create auth data
+    nonce = int(time.time())
+    sig = create_hmac_sig(args.api_key_secret, str(nonce))
+    auth = {"signature": sig, "api_key": args.api_key_token, "nonce": nonce}
+    # open websocket
+    sio = socketio.Client()
+    @sio.event
+    def connect():
+        print("connection established")
+        sio.emit("auth", auth)
+
+    @sio.event
+    def info(data):
+        print("info event received:", data)
+
+    @sio.event
+    def claimed(data):
+        print("claimed event received:", data)
+
+    @sio.event
+    def disconnect():
+        print("disconnected from server")
+
+    sio.connect(WS_URL)
+    sio.wait()
+
+def watch(args):
+    print(":: calling watch..")
+    r = req("watch", {"address": args.address}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 def register(args):
     print(":: calling register..")
     r = req("register", {"token": args.token}, args.api_key_token, args.api_key_secret)
@@ -90,7 +138,11 @@ if __name__ == "__main__":
 
     # set appropriate function
     function = None
-    if args.command == "register":
+    if args.command == "websocket":
+        function = websocket
+    elif args.command == "watch":
+        function = watch
+    elif args.command == "register":
         function = register
     elif args.command == "check":
         function = check

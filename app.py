@@ -2,16 +2,21 @@
 import os
 import logging
 import sys
+import json
 
 from flask import url_for, redirect, render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
+from flask_socketio import emit, join_room, leave_room
 
-from app_core import app, db
+from app_core import app, db, socketio
 from models import security, user_datastore, Role, User, ClaimCode, ApiKey
 import admin
 from utils import check_hmac_auth
 
 logger = logging.getLogger(__name__)
+
+ws_api_keys = {}
+ws_sids = {}
 
 #
 # Helper functions
@@ -55,6 +60,17 @@ def add_role(email, role_name):
             logger.info('user already has role')
         db.session.commit()
 
+def check_auth(api_key_token, nonce, sig, body):
+    api_key = ApiKey.from_token(db.session, api_key_token)
+    if not api_key:
+        return False, "not found", None
+    res, reason = check_hmac_auth(api_key, nonce, sig, body)
+    if not res:
+        return False, reason, None
+    # update api key nonce
+    db.session.commit()
+    return True, "", api_key
+
 #
 # Flask views
 #
@@ -69,26 +85,57 @@ def index():
 
 @app.route("/test/<token>")
 def test(token):
-    #TODO: only allow when test environment var is present 
+    if not app.config["DEBUG"]:
+        return abort(404)
     claim_code = ClaimCode.from_token(db.session, token)
+    for api_key in ws_api_keys.keys():
+        print("sending claim code to %s" % api_key)
+        socketio.emit("info", claim_code.to_json(), json=True, room=api_key)
     if claim_code:
         return jsonify(claim_code.to_json())
     return abort(404)
 
 #
-# Private (merchant) API
+# Websocket events
 #
 
-def check_auth(api_key_token, nonce, sig, body):
-    api_key = ApiKey.from_token(db.session, api_key_token)
-    if not api_key:
-        return False, "not found", None
-    res, reason = check_hmac_auth(api_key, nonce, sig, request.data)
-    if not res:
-        return False, reason, None
-    # update api key nonce
-    db.session.commit()
-    return True, "", api_key
+def alert_claimed(claim_code):
+    for apikey in claim_code.user.apikeys:
+        socketio.emit("claimed", claim_code.to_json(), json=True, room=apikey.token)
+
+@socketio.on_error()
+def websocket_error(e):
+    print(e)
+
+@socketio.on("connect")
+def websocket_connect():
+    print("connect %s" % request.sid)
+
+@socketio.on("auth")
+def websocket_auth(auth):
+    # check auth
+    res, reason, api_key = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
+    if res:
+        emit("info", "authenticated!")
+        # join room and store user
+        join_room(auth["api_key"])
+        ws_api_keys[auth["api_key"]] = request.sid
+        ws_sids[request.sid] = auth["api_key"]
+
+@socketio.on("disconnect")
+def websocket_disconnect():
+    print("disconnect sid: %s" % request.sid)
+    if request.sid in ws_sids:
+        api_key = ws_sids[request.sid]
+        if api_key in ws_api_keys:
+            print("disconnect api key: %s" % api_key)
+            leave_room(api_key)
+            del ws_api_keys[api_key]
+        del ws_sids[request.sid]
+
+#
+# Private (merchant) API
+#
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -136,6 +183,7 @@ def claim():
             claim_code.secret = secret
             claim_code.address = address
             claim_code.status = "claimed"
+            alert_claimed(claim_code)
             db.session.add(claim_code)
             db.session.commit()
             return jsonify(claim_code.to_json())
@@ -160,4 +208,4 @@ if __name__ == "__main__":
     else:
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
-        app.run(host="0.0.0.0", port=port)
+        socketio.run(app, port=port)
