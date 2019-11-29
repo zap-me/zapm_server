@@ -48,7 +48,7 @@ class AddressWatcher(gevent.Greenlet):
                 #TODO log error
                 print(r)
             # sleep
-            gevent.sleep(10)
+            gevent.sleep(5)
 
     def watch(self, address, api_key):
         if not address in self.addresses:

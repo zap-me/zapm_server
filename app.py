@@ -17,16 +17,7 @@ from addresswatcher import AddressWatcher
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
 ws_sids = {}
-
-
-def transfer_tx_callback(api_keys, tx):
-    txt = json.dumps(tx)
-    print("transfer_tx_callback: tx %s" % txt)
-    for api_key in api_keys:
-        print("sending 'claimed' event to room %s" % api_key)
-        socketio.emit("claimed", txt, json=True, room=api_key)
-
-aw = AddressWatcher(transfer_tx_callback, True)
+aw = None
 
 #
 # Helper functions
@@ -80,6 +71,20 @@ def check_auth(api_key_token, nonce, sig, body):
     # update api key nonce
     db.session.commit()
     return True, "", api_key
+
+def transfer_tx_callback(api_keys, tx):
+    txt = json.dumps(tx)
+    print("transfer_tx_callback: tx %s" % txt)
+    for api_key in api_keys:
+        print("sending 'claimed' event to room %s" % api_key)
+        socketio.emit("claimed", txt, json=True, room=api_key)
+
+@app.before_first_request
+def start_address_watcher():
+    global aw
+    if aw is None:
+        aw = AddressWatcher(transfer_tx_callback, True)
+        aw.start()
 
 #
 # Flask views
@@ -240,11 +245,10 @@ if __name__ == "__main__":
         if sys.argv[1] == "add_role":
             add_role(sys.argv[2], sys.argv[3])
     else:
-        # start addresswatcher
-        aw.start()
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
         print("binding to port: %d" % port)
-        socketio.run(app, port=port)
+        socketio.run(app, host="0.0.0.0", port=port)
         # stop addresswatcher
-        aw.kill()
+        if aw:
+            aw.kill()

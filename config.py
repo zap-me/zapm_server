@@ -1,5 +1,3 @@
-DEBUG = True
-
 # Create dummy secrey key so we can use sessions
 SECRET_KEY = '123456790'
 
