@@ -104,6 +104,7 @@ class ClaimCodeSchema(Schema):
     date = fields.Float()
     token = fields.String()
     secret = fields.String()
+    amount = fields.Integer()
     address = fields.String()
     status = fields.String()
 
@@ -114,14 +115,16 @@ class ClaimCode(db.Model):
     date = db.Column(db.DateTime())
     token = db.Column(db.String(255), unique=True, nullable=False)
     secret = db.Column(db.String(255))
+    amount = db.Column(db.Integer)
     address = db.Column(db.String(255))
     status = db.Column(db.String(255))
 
-    def __init__(self, user, token):
+    def __init__(self, user, token, amount):
         self.user = user
         self.date = datetime.datetime.now()
         self.token = token
         self.secret = None
+        self.amount = amount
         self.address = None
         self.status = "created"
 
@@ -139,6 +142,25 @@ class ClaimCode(db.Model):
     def to_json(self):
         schema = ClaimCodeSchema()
         return schema.dump(self).data
+
+class TxNotification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('txnotifications', lazy='dynamic'))
+    date = db.Column(db.DateTime())
+    txid = db.Column(db.String(255), unique=True)
+
+    def __init__(self, user, txid):
+        self.user = user
+        self.date = datetime.datetime.now()
+        self.txid = txid
+
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
+
+    def __repr__(self):
+        return "<TxNotification %r>" % (self.txid)
 
 class ApiKey(db.Model):
     id = db.Column(db.Integer, primary_key=True)

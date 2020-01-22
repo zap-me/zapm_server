@@ -9,7 +9,7 @@ from flask_security.utils import encrypt_password
 from flask_socketio import emit, join_room, leave_room
 
 from app_core import app, db, socketio
-from models import security, user_datastore, Role, User, ClaimCode, ApiKey
+from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey
 import admin
 from utils import check_hmac_auth
 from addresswatcher import AddressWatcher
@@ -78,6 +78,10 @@ def transfer_tx_callback(api_keys, tx):
     for api_key in api_keys:
         print("sending 'claimed' event to room %s" % api_key)
         socketio.emit("claimed", txt, json=True, room=api_key)
+        api_key = ApiKey.from_token(db.session, api_key)
+        txnoti = TxNotification(api_key.user, tx["id"])
+        db.session.add(txnoti)
+        db.session.commit()
 
 @app.before_first_request
 def start_address_watcher():
@@ -184,10 +188,11 @@ def register():
     api_key = content["api_key"]
     nonce = content["nonce"]
     token = content["token"]
+    amount = content["amount"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return abort(400, reason)
-    claim_code = ClaimCode(api_key.user, token)
+    claim_code = ClaimCode(api_key.user, token, amount)
     db.session.add(claim_code)
     db.session.commit()
     return jsonify(claim_code.to_json())

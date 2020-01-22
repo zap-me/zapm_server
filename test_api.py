@@ -38,6 +38,7 @@ def construct_parser():
     parser_register.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_register.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
     parser_register.add_argument("token", metavar="TOKEN", type=str, help="the claim code token")
+    parser_register.add_argument("amount", metavar="AMOUNT", type=int, help="the claim code amount (integer, lowest denomination of asset)")
 
     parser_check = subparsers.add_parser("check", help="Check a claim code")
     parser_check.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
@@ -115,7 +116,7 @@ def watch(args):
 
 def register(args):
     print(":: calling register..")
-    r = req("register", {"token": args.token}, args.api_key_token, args.api_key_secret)
+    r = req("register", {"token": args.token, "amount": args.amount}, args.api_key_token, args.api_key_secret)
     check_request_status(r)
     print(r.text)
 
