@@ -1,6 +1,9 @@
 import datetime
 
 from flask import redirect, url_for, request
+from flask_admin.babel import lazy_gettext
+from flask_admin.contrib.sqla.filters import BaseSQLAFilter
+from flask_admin.model import filters
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_admin.contrib import sqla
@@ -8,13 +11,6 @@ from marshmallow import Schema, fields
 
 from app_core import app, db
 from utils import generate_key
-
-from flask_admin.babel import lazy_gettext
-from flask_admin.model import filters
-from flask_admin.contrib.sqla import tools
-from sqlalchemy.sql import not_, or_
-from flask_admin.contrib.sqla.filters import BaseSQLAFilter
-
 
 # Define models
 roles_users = db.Table(
@@ -249,6 +245,7 @@ class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
 
 class ClaimsCodeRestrictedModelView(sqla.ModelView):
     column_exclude_list = ['password', 'secret']
+    column_export_exclude_list = ['secret']
     column_filters = [ DateBetweenFilter(ClaimCode.date, 'Search Date'), DateTimeGreaterFilter(ClaimCode.date, 'Search Date'), DateSmallerFilter(ClaimCode.date, 'Search Date'), FilterEqual(ClaimCode.status, 'Search Status'), FilterNotEqual(ClaimCode.status, 'Search Status') ]
 
     def is_accessible(self):
@@ -256,30 +253,9 @@ class ClaimsCodeRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_create = True
             self.can_edit = True
-            self.can_delete = True
             self.can_export = True
             return True
-        if current_user.has_role('authorizer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = True
-            return True
-        if current_user.has_role('proposer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = True
-            return True
-        if current_user.has_role('viewer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = False
-            return True
-
         return False
 
     def handle_view(self, name, **kwargs):
@@ -297,29 +273,8 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_create = True
             self.can_edit = True
-            self.can_delete = True
             self.can_export = True
             return True
-        if current_user.has_role('authorizer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = True
-            return True
-        if current_user.has_role('proposer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = True
-            return True
-        if current_user.has_role('viewer'):
-            self.can_create = False
-            self.can_delete = False
-            self.can_edit = False
-            self.can_export = False
-            return True
-
         return False
 
