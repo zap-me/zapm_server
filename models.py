@@ -249,6 +249,7 @@ class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
 
 class ClaimsCodeRestrictedModelView(sqla.ModelView):
     column_exclude_list = ['password', 'secret']
+    column_export_exclude_list = ['secret']
     column_filters = [ DateBetweenFilter(ClaimCode.date, 'Search Date'), DateTimeGreaterFilter(ClaimCode.date, 'Search Date'), DateSmallerFilter(ClaimCode.date, 'Search Date'), FilterEqual(ClaimCode.status, 'Search Status'), FilterNotEqual(ClaimCode.status, 'Search Status') ]
 
     def is_accessible(self):
