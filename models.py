@@ -2,15 +2,12 @@ import datetime
 
 from flask import redirect, url_for, request
 from flask_admin.babel import lazy_gettext
-from flask_admin.contrib.sqla import tools
 from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from flask_admin.model import filters
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_admin.contrib import sqla
 from marshmallow import Schema, fields
-from sqlalchemy.sql import not_, or_
-
 
 from app_core import app, db
 from utils import generate_key
