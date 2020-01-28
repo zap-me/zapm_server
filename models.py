@@ -1,6 +1,9 @@
 import datetime
 
 from flask import redirect, url_for, request
+from flask_admin.babel import lazy_gettext
+from flask_admin.contrib.sqla.filters import BaseSQLAFilter
+from flask_admin.model import filters
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_admin.contrib import sqla
@@ -193,3 +196,83 @@ class ApiKey(db.Model):
 
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
+
+class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
+    def __init__(self, column, name, options=None, data_type=None):
+        super(DateBetweenFilter, self).__init__(column,
+                                                name,
+                                                options,
+                                                data_type='daterangepicker')
+
+    def apply(self, query, value, alias=None):
+        start, end = value
+        return query.filter(self.get_column(alias).between(start, end))
+
+class FilterEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) == value)
+
+    def operation(self):
+        return lazy_gettext('equals')
+
+class FilterNotEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) != value)
+
+    def operation(self):
+        return lazy_gettext('not equal')
+
+class FilterGreater(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) > value)
+
+    def operation(self):
+        return lazy_gettext('greater than')
+
+class FilterSmaller(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) < value)
+
+    def operation(self):
+        return lazy_gettext('smaller than')
+
+class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
+    pass
+
+class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
+    pass
+
+
+class ClaimsCodeRestrictedModelView(sqla.ModelView):
+    column_exclude_list = ['password', 'secret']
+    column_export_exclude_list = ['secret']
+    column_filters = [ DateBetweenFilter(ClaimCode.date, 'Search Date'), DateTimeGreaterFilter(ClaimCode.date, 'Search Date'), DateSmallerFilter(ClaimCode.date, 'Search Date'), FilterEqual(ClaimCode.status, 'Search Status'), FilterNotEqual(ClaimCode.status, 'Search Status') ]
+
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+
+        if current_user.has_role('admin'):
+            self.can_export = True
+            return True
+        return False
+
+    def handle_view(self, name, **kwargs):
+        if current_user.is_authenticated:
+            abort(403)
+        else:
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return False
+
+class TxNotificationRestrictedModelView(sqla.ModelView):
+    column_filters = [ DateBetweenFilter(TxNotification.date, 'Search Date'), DateTimeGreaterFilter(TxNotification.date, 'Search Date'), DateSmallerFilter(TxNotification.date, 'Search Date') ]
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+
+        if current_user.has_role('admin'):
+            self.can_export = True
+            return True
+        return False
+
