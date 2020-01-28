@@ -8,7 +8,6 @@ from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_admin.contrib import sqla
 from marshmallow import Schema, fields
-
 from app_core import app, db
 from utils import generate_key
 
@@ -253,7 +252,6 @@ class ClaimsCodeRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_edit = True
             self.can_export = True
             return True
         return False
@@ -273,7 +271,6 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_edit = True
             self.can_export = True
             return True
         return False
