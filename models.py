@@ -12,7 +12,6 @@ from marshmallow import Schema, fields
 from app_core import app, db
 from utils import generate_key
 
-
 # Define models
 roles_users = db.Table(
     'roles_users',
