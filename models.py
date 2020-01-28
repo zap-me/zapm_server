@@ -253,7 +253,6 @@ class ClaimsCodeRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_edit = True
             self.can_export = True
             return True
         return False
@@ -273,7 +272,6 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_edit = True
             self.can_export = True
             return True
         return False
