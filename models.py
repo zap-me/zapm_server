@@ -8,6 +8,7 @@ from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_admin.contrib import sqla
 from marshmallow import Schema, fields
+
 from app_core import app, db
 from utils import generate_key
 
