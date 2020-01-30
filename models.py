@@ -53,6 +53,52 @@ class User(db.Model, UserMixin):
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
+# Filters to be used in the app.
+class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
+    def __init__(self, column, name, options=None, data_type=None):
+        super(DateBetweenFilter, self).__init__(column,
+                                                name,
+                                                options,
+                                                data_type='daterangepicker')
+
+    def apply(self, query, value, alias=None):
+        start, end = value
+        return query.filter(self.get_column(alias).between(start, end))
+
+class FilterEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) == value)
+
+    def operation(self):
+        return lazy_gettext('equals')
+
+class FilterNotEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) != value)
+
+    def operation(self):
+        return lazy_gettext('not equal')
+
+class FilterGreater(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) > value)
+
+    def operation(self):
+        return lazy_gettext('greater than')
+
+class FilterSmaller(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) < value)
+
+    def operation(self):
+        return lazy_gettext('smaller than')
+
+class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
+    pass
+
+class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
+    pass
+
 # Create customized model view classes
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
@@ -197,51 +243,39 @@ class ApiKey(db.Model):
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
 
-class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
-    def __init__(self, column, name, options=None, data_type=None):
-        super(DateBetweenFilter, self).__init__(column,
-                                                name,
-                                                options,
-                                                data_type='daterangepicker')
+class MerchantTx(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime())
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('merchanttxs', lazy='dynamic'))
+    walletaddr = db.Column(db.String(255), nullable=False)
+    amount = db.Column(db.Integer)
+    txid = db.Column(db.String(255), nullable=False)
+    txdirection = db.Column(db.Boolean, nullable=False)
+    type = db.Column(db.String(255), nullable=False)
 
-    def apply(self, query, value, alias=None):
-        start, end = value
-        return query.filter(self.get_column(alias).between(start, end))
+    def __init__(self, walletaddr, amount, txid, txdirection, type):
+        self.walletaddr = walletaddr
+        self.amount = amount
+        self.txid = txid
+        self.txdirection = txdirection
+        self.type = type
+        generate_defaults()
 
-class FilterEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) == value)
+    def generate_defaults(self):
+        self.user = current_user
+        self.date = datetime.datetime.now()
 
-    def operation(self):
-        return lazy_gettext('equals')
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
 
-class FilterNotEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) != value)
+    @classmethod
+    def from_token(cls, session, txid):
+        return session.query(cls).filter(cls.txid == txid).first()
 
-    def operation(self):
-        return lazy_gettext('not equal')
-
-class FilterGreater(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) > value)
-
-    def operation(self):
-        return lazy_gettext('greater than')
-
-class FilterSmaller(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) < value)
-
-    def operation(self):
-        return lazy_gettext('smaller than')
-
-class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
-    pass
-
-class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
-    pass
-
+    def __repr__(self):
+        return"<MerchantTx %r>" % (self.txid)
 
 class ClaimCodeRestrictedModelView(sqla.ModelView):
     can_create = False
@@ -281,4 +315,22 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             self.can_export = True
             return True
         return False
+
+class MerchantTxModelView(sqla.ModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    can_export = True
+    form_excluded_columns = ['user']
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date') ]
+
+    def get_query(self):
+        return self.session.query(self.model).filter(self.model.user==current_user)
+
+    def get_count_query(self):
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.generate_defaults()
 

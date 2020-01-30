@@ -9,7 +9,7 @@ from flask_security.utils import encrypt_password
 from flask_socketio import emit, join_room, leave_room
 
 from app_core import app, db, socketio
-from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey
+from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx
 import admin
 from utils import check_hmac_auth
 from addresswatcher import AddressWatcher
@@ -211,6 +211,26 @@ def check():
     if claim_code and claim_code.user == api_key.user:
         return jsonify(claim_code.to_json())
     return abort(404)
+
+@app.route("/merchanttxlog", methods=["POST"])
+def merchanttxlog():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    token = content["token"]
+    walletaddr = content["walletaddr"]
+    amount = content["amount"]
+    txid = content["txid"]
+    txdirection = content["txdirection"]
+    type = content["type"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    merchant_tx = MerchantTx(api_key.user, token, walletaddr, amount, txid, txdirection, type)
+    db.session.add(merchant_tx)
+    db.session.commit()
+    return jsonify(merchant_tx.to_json())
 
 #
 # Public (customer) API
