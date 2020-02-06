@@ -53,6 +53,51 @@ class User(db.Model, UserMixin):
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
 
+class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
+    def __init__(self, column, name, options=None, data_type=None):
+        super(DateBetweenFilter, self).__init__(column,
+                                                name,
+                                                options,
+                                                data_type='daterangepicker')
+
+    def apply(self, query, value, alias=None):
+        start, end = value
+        return query.filter(self.get_column(alias).between(start, end))
+
+class FilterEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) == value)
+
+    def operation(self):
+        return lazy_gettext('equals')
+
+class FilterNotEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) != value)
+
+    def operation(self):
+        return lazy_gettext('not equal')
+
+class FilterGreater(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) > value)
+
+    def operation(self):
+        return lazy_gettext('greater than')
+
+class FilterSmaller(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) < value)
+
+    def operation(self):
+        return lazy_gettext('smaller than')
+
+class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
+    pass
+
+class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
+    pass
+
 # Create customized model view classes
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
@@ -90,8 +135,27 @@ class UserModelView(BaseModelView):
                 current_user.is_authenticated
         )
 
-class ApiKeyModelView(UserModelView):
+class ApiKeyModelView(BaseModelView):
+    can_export = True
+    column_list = ('date', 'token', 'secret')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
+
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+
+        if current_user.has_role('admin'):
+            return True
+        if current_user.has_role('merchant'):
+            return True
+
+    def handle_view(self, name, **kwargs):
+        if current_user.is_authenticated:
+            abort(403)
+        else:
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return False
 
     def get_query(self):
         return self.session.query(self.model).filter(self.model.user==current_user)
@@ -197,53 +261,51 @@ class ApiKey(db.Model):
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
 
-class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
-    def __init__(self, column, name, options=None, data_type=None):
-        super(DateBetweenFilter, self).__init__(column,
-                                                name,
-                                                options,
-                                                data_type='daterangepicker')
+class MerchantTxSchema(Schema):
+    date = fields.Float()
+    user_id = fields.Integer()
+    wallet_address = fields.String()
+    amount = fields.Integer()
+    txid = fields.String()
+    direction = fields.Integer()
+    category = fields.String()
 
-    def apply(self, query, value, alias=None):
-        start, end = value
-        return query.filter(self.get_column(alias).between(start, end))
+class MerchantTx(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.DateTime())
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('merchanttxs', lazy='dynamic'))
+    wallet_address = db.Column(db.String(255), nullable=False)
+    amount = db.Column(db.Integer)
+    txid = db.Column(db.String(255), nullable=False)
+    direction = db.Column(db.Boolean, nullable=False)
+    category = db.Column(db.String(255), nullable=False)
 
-class FilterEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) == value)
+    def __init__(self, user, wallet_address, amount, txid, direction, category):
+        self.date = datetime.datetime.now()
+        self.user = user
+        self.wallet_address = wallet_address
+        self.amount = amount
+        self.txid = txid
+        self.direction = direction
+        self.category = category
 
-    def operation(self):
-        return lazy_gettext('equals')
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
 
-class FilterNotEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) != value)
+    @classmethod
+    def from_token(cls, session, txid):
+        return session.query(cls).filter(cls.txid == txid).first()
 
-    def operation(self):
-        return lazy_gettext('not equal')
+    def __repr__(self):
+        return"<MerchantTx %r>" % (self.txid)
 
-class FilterGreater(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) > value)
+    def to_json(self):
+        schema = MerchantTxSchema()
+        return schema.dump(self).data
 
-    def operation(self):
-        return lazy_gettext('greater than')
-
-class FilterSmaller(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) < value)
-
-    def operation(self):
-        return lazy_gettext('smaller than')
-
-class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
-    pass
-
-class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
-    pass
-
-
-class ClaimCodeRestrictedModelView(sqla.ModelView):
+class ClaimCodeRestrictedModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -268,7 +330,7 @@ class ClaimCodeRestrictedModelView(sqla.ModelView):
             return redirect(url_for('security.login', next=request.url))
         return False
 
-class TxNotificationRestrictedModelView(sqla.ModelView):
+class TxNotificationRestrictedModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -281,4 +343,40 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             self.can_export = True
             return True
         return False
+
+class MerchantTxRestrictedModelView(BaseModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    can_export = True
+    form_excluded_columns = ['user']
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
+
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+
+        if current_user.has_role('admin'):
+            return True
+        if current_user.has_role('merchant'):
+            return True
+        return False
+
+    def handle_view(self, name, **kwargs):
+        if current_user.is_authenticated:
+            abort(403)
+        else:
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return False
+
+    def get_query(self):
+        return self.session.query(self.model).filter(self.model.user==current_user)
+
+    def get_count_query(self):
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.generate_defaults()
 

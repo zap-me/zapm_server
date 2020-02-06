@@ -50,6 +50,15 @@ def construct_parser():
     parser_claim.add_argument("secret", metavar="SECRET", type=str, help="the claim code secret")
     parser_claim.add_argument("address", metavar="ADDR", type=str, help="the claim code address")
 
+    parser_merchanttx = subparsers.add_parser("merchanttx", help="Log merchant transaction")
+    parser_merchanttx.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_merchanttx.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+    parser_merchanttx.add_argument("wallet_address", metavar="WALLETADDR", type=str, help="Customers wallet address")
+    parser_merchanttx.add_argument("amount", metavar="AMOUNT", type=int, help="the transaction amount (integer, lowest denomination of asset)")
+    parser_merchanttx.add_argument("txid", metavar="TXID", type=str, help="Customers Transaction ID")
+    parser_merchanttx.add_argument("direction", metavar="DIRECTION", type=int, help="0 (in), 1 (out)")
+    parser_merchanttx.add_argument("category", metavar="CATEGORY", type=str, help="payment/rebate/etc")
+
     return parser
 
 def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
@@ -132,6 +141,12 @@ def claim(args):
     check_request_status(r)
     print(r.text)
 
+def merchanttx(args):
+    print(":: calling merchanttx..")
+    r = req("merchanttx", {"amount": args.amount, "wallet_address": args.wallet_address, "direction": args.direction, "txid": args.txid, "category": args.category}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 if __name__ == "__main__":
     # parse arguments
     parser = construct_parser()
@@ -149,6 +164,8 @@ if __name__ == "__main__":
         function = check
     elif args.command == "claim":
         function = claim
+    elif args.command == "merchanttx":
+        function = merchanttx
     else:
         parser.print_help()
         sys.exit(EXIT_NO_COMMAND)
