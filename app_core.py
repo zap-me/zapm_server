@@ -10,6 +10,8 @@ app = Flask(__name__)
 app.config.from_pyfile("config.py")
 if os.getenv("DEBUG"):
     app.config["DEBUG"] = True
+if os.getenv("DEBUG_REQUESTS"):
+    app.config["DEBUG_REQUESTS"] = True
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 if os.getenv("SESSION_KEY"):
