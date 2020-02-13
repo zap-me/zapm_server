@@ -77,7 +77,7 @@ def transfer_tx_callback(api_keys, tx):
     print("transfer_tx_callback: tx %s" % txt)
     for api_key in api_keys:
         print("sending 'claimed' event to room %s" % api_key)
-        socketio.emit("claimed", txt, json=True, room=api_key)
+        socketio.emit("tx", txt, json=True, room=api_key)
         api_key = ApiKey.from_token(db.session, api_key)
         txnoti = TxNotification(api_key.user, tx["id"])
         db.session.add(txnoti)
