@@ -8,3 +8,4 @@ marshmallow==2.15.3
 psycopg2-binary==2.8.1
 requests==2.20.0
 gevent==1.4.0
+gevent-websocket==0.10.1 
