@@ -111,6 +111,10 @@ def websocket(args):
         print("claimed event received:", data)
 
     @sio.event
+    def tx(data):
+        print("tx event received:", data)
+
+    @sio.event
     def disconnect():
         print("disconnected from server")
 

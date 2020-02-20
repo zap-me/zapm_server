@@ -6,7 +6,7 @@ import json
 
 from flask import url_for, redirect, render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
-from flask_socketio import emit, join_room, leave_room
+from flask_socketio import Namespace, emit, join_room, leave_room
 
 from app_core import app, db, socketio
 from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx
@@ -77,7 +77,7 @@ def transfer_tx_callback(api_keys, tx):
     print("transfer_tx_callback: tx %s" % txt)
     for api_key in api_keys:
         print("sending 'claimed' event to room %s" % api_key)
-        socketio.emit("claimed", txt, json=True, room=api_key)
+        socketio.emit("tx", txt, json=True, room=api_key)
         api_key = ApiKey.from_token(db.session, api_key)
         txnoti = TxNotification(api_key.user, tx["id"])
         db.session.add(txnoti)
@@ -93,6 +93,12 @@ def start_address_watcher():
 #
 # Flask views
 #
+
+@app.before_request
+def before_request_func():
+    if app.config["DEBUG_REQUESTS"]:
+        print("URL: %s" % request.url)
+        print(request.headers)
 
 @app.route("/")
 def index():
@@ -134,35 +140,44 @@ def alert_claimed(claim_code):
     for apikey in claim_code.user.apikeys:
         socketio.emit("claimed", claim_code.to_json(), json=True, room=apikey.token)
 
-@socketio.on_error()
-def websocket_error(e):
-    print(e)
+class SocketIoNamespace(Namespace):
+    def trigger_event(self, event, sid, *args):
+        if sid not in self.server.environ:
+            # we don't have record of this client, ignore this event
+            return '', 400
+        app = self.server.environ[sid]['flask.app']
+        if app.config["DEBUG_REQUESTS"]:
+            with app.request_context(self.server.environ[sid]):
+                before_request_func()
+        return super(SocketIoNamespace, self).trigger_event(event, sid, *args)
 
-@socketio.on("connect")
-def websocket_connect():
-    print("connect %s" % request.sid)
+    def on_error(self, e):
+        print(e)
 
-@socketio.on("auth")
-def websocket_auth(auth):
-    # check auth
-    res, reason, api_key = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
-    if res:
-        emit("info", "authenticated!")
-        # join room and store user
-        join_room(auth["api_key"])
-        ws_api_keys[auth["api_key"]] = request.sid
-        ws_sids[request.sid] = auth["api_key"]
+    def on_connect(self):
+        print("connect %s" % request.sid)
 
-@socketio.on("disconnect")
-def websocket_disconnect():
-    print("disconnect sid: %s" % request.sid)
-    if request.sid in ws_sids:
-        api_key = ws_sids[request.sid]
-        if api_key in ws_api_keys:
-            print("disconnect api key: %s" % api_key)
-            leave_room(api_key)
-            del ws_api_keys[api_key]
-        del ws_sids[request.sid]
+    def on_auth(self, auth):
+        # check auth
+        res, reason, api_key = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
+        if res:
+            emit("info", "authenticated!")
+            # join room and store user
+            join_room(auth["api_key"])
+            ws_api_keys[auth["api_key"]] = request.sid
+            ws_sids[request.sid] = auth["api_key"]
+
+    def on_disconnect(self):
+        print("disconnect sid: %s" % request.sid)
+        if request.sid in ws_sids:
+            api_key = ws_sids[request.sid]
+            if api_key in ws_api_keys:
+                print("disconnect api key: %s" % api_key)
+                leave_room(api_key)
+                del ws_api_keys[api_key]
+            del ws_sids[request.sid]
+
+socketio.on_namespace(SocketIoNamespace("/"))
 
 #
 # Private (merchant) API
