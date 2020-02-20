@@ -135,48 +135,16 @@ class UserModelView(BaseModelView):
                 current_user.is_authenticated
         )
 
-class ApiKeyAdminModelView(BaseModelView):
+class ApiKeyModelView(BaseModelView):
+    can_export = True
+    column_list = ('date', 'token', 'secret')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def is_accessible(self):
         if not current_user.is_active or not current_user.is_authenticated:
             return False
 
-        if current_user.has_role('admin'):
-            self.can_export = True
-            return True
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
-
-    def get_query(self):
-        return self.session.query(self.model).filter(self.model.user==current_user)
-
-    def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-    def on_model_change(self, form, model, is_created):
-        if is_created:
-            model.generate_defaults()
-
-class ApiKeyMerchantModelView(BaseModelView):
-    can_create = True
-    can_delete = True
-    can_edit = False
-    form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
-    column_list = ['date', 'name', 'token', 'secret']
-
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-
-        if current_user.has_role('merchant'):
-            self.can_export = True
+        if current_user.has_role('admin') or current_user.has_role('merchant'):
             return True
 
     def handle_view(self, name, **kwargs):
