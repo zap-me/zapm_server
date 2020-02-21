@@ -135,8 +135,27 @@ class UserModelView(BaseModelView):
                 current_user.is_authenticated
         )
 
-class ApiKeyModelView(UserModelView):
+class ApiKeyModelView(BaseModelView):
+    can_export = True
+    column_list = ('date', 'token', 'secret')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
+
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+
+        if current_user.has_role('admin'):
+            return True
+        if current_user.has_role('merchant'):
+            return True
+
+    def handle_view(self, name, **kwargs):
+        if current_user.is_authenticated:
+            abort(403)
+        else:
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return False
 
     def get_query(self):
         return self.session.query(self.model).filter(self.model.user==current_user)
@@ -286,7 +305,7 @@ class MerchantTx(db.Model):
         schema = MerchantTxSchema()
         return schema.dump(self).data
 
-class ClaimCodeRestrictedModelView(sqla.ModelView):
+class ClaimCodeRestrictedModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -311,7 +330,7 @@ class ClaimCodeRestrictedModelView(sqla.ModelView):
             return redirect(url_for('security.login', next=request.url))
         return False
 
-class TxNotificationRestrictedModelView(sqla.ModelView):
+class TxNotificationRestrictedModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -321,14 +340,14 @@ class TxNotificationRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_export = True
             return True
         return False
 
-class MerchantTxRestrictedModelView(sqla.ModelView):
+class MerchantTxRestrictedModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
+    can_export = True
     form_excluded_columns = ['user']
     column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
 
@@ -337,7 +356,8 @@ class MerchantTxRestrictedModelView(sqla.ModelView):
             return False
 
         if current_user.has_role('admin'):
-            self.can_export = True
+            return True
+        if current_user.has_role('merchant'):
             return True
         return False
 
@@ -358,4 +378,5 @@ class MerchantTxRestrictedModelView(sqla.ModelView):
     def on_model_change(self, form, model, is_created):
         if is_created:
             model.generate_defaults()
+
 
