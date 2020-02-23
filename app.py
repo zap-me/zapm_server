@@ -94,9 +94,13 @@ def start_address_watcher():
 # Flask views
 #
 
+@app.context_processor
+def inject_rates():
+    return dict(merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"])
+
 @app.before_request
 def before_request_func():
-    if app.config["DEBUG_REQUESTS"]:
+    if "DEBUG_REQUESTS" in app.config:
         print("URL: %s" % request.url)
         print(request.headers)
 
@@ -146,7 +150,7 @@ class SocketIoNamespace(Namespace):
             # we don't have record of this client, ignore this event
             return '', 400
         app = self.server.environ[sid]['flask.app']
-        if app.config["DEBUG_REQUESTS"]:
+        if "DEBUG_REQUESTS" in app.config:
             with app.request_context(self.server.environ[sid]):
                 before_request_func()
         return super(SocketIoNamespace, self).trigger_event(event, sid, *args)
@@ -245,6 +249,18 @@ def merchanttx():
     db.session.add(merchant_tx)
     db.session.commit()
     return jsonify(merchant_tx.to_json())
+
+@app.route("/rates", methods=["POST"])
+def rates():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    rates = {"merchant": str(app.config["MERCHANT_RATE"]), "customer": str(app.config["CUSTOMER_RATE"])}
+    return jsonify(rates)
 
 #
 # Public (customer) API

@@ -137,7 +137,7 @@ class UserModelView(BaseModelView):
 
 class ApiKeyModelView(BaseModelView):
     can_export = True
-    column_list = ('date', 'token', 'secret')
+    column_list = ('date', 'name', 'token', 'secret')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def is_accessible(self):
@@ -166,6 +166,10 @@ class ApiKeyModelView(BaseModelView):
     def on_model_change(self, form, model, is_created):
         if is_created:
             model.generate_defaults()
+
+    def is_accessible(self):
+        return (current_user.is_active and
+                current_user.is_authenticated)
 
 class ClaimCodeSchema(Schema):
     date = fields.Float()

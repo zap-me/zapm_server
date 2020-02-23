@@ -59,6 +59,9 @@ def construct_parser():
     parser_merchanttx.add_argument("direction", metavar="DIRECTION", type=int, help="0 (in), 1 (out)")
     parser_merchanttx.add_argument("category", metavar="CATEGORY", type=str, help="payment/rebate/etc")
 
+    parser_rates = subparsers.add_parser("rates", help="Get the rates")
+    parser_rates.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_rates.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
     return parser
 
 def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
@@ -151,6 +154,12 @@ def merchanttx(args):
     check_request_status(r)
     print(r.text)
 
+def rates(args):
+    print(":: calling rates..")
+    r = req("rates", {}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 if __name__ == "__main__":
     # parse arguments
     parser = construct_parser()
@@ -170,6 +179,8 @@ if __name__ == "__main__":
         function = claim
     elif args.command == "merchanttx":
         function = merchanttx
+    elif args.command == "rates":
+        function = rates
     else:
         parser.print_help()
         sys.exit(EXIT_NO_COMMAND)

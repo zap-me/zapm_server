@@ -16,3 +16,15 @@
 </div>
 {% endif %}
 {% endblock %}
+
+{% block tail %}
+{% if current_user.is_authenticated and current_user.has_role("admin") %}
+<div class="container">
+    <small>
+        Current rates:<br/>
+        &nbsp;&nbsp;&nbsp;merchant: {{merchant_rate * 100}}%<br/>
+        &nbsp;&nbsp;&nbsp;customer: {{customer_rate * 100}}%
+    </small>
+</div>
+{% endif %}
+{% endblock %}
