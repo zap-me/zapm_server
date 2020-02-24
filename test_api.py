@@ -62,6 +62,19 @@ def construct_parser():
     parser_rates = subparsers.add_parser("rates", help="Get the rates")
     parser_rates.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_rates.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+
+    parser_settlement = subparsers.add_parser("settlement", help="Create a settlement")
+    parser_settlement.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_settlement.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+    parser_settlement.add_argument("bank_account", metavar="BANK_ACCOUNT", type=int, help="the bank account to settle to")
+    parser_settlement.add_argument("amount", metavar="AMOUNT", type=int, help="the zap settlement amount (integer, lowest denomination of asset)")
+
+    parser_settlement_set_txid = subparsers.add_parser("settlement_set_txid", help="Update a settlement with a txid")
+    parser_settlement_set_txid.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_settlement_set_txid.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+    parser_settlement_set_txid.add_argument("token", metavar="TOKEN", type=str, help="Settlement token")
+    parser_settlement_set_txid.add_argument("txid", metavar="TXID", type=str, help="Settlement transaction ID")
+
     return parser
 
 def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
@@ -160,6 +173,18 @@ def rates(args):
     check_request_status(r)
     print(r.text)
 
+def settlement(args):
+    print(":: calling settlement..")
+    r = req("settlement", {"bank_account": args.bank_account, "amount": args.amount}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
+def settlement_set_txid(args):
+    print(":: calling settlement_set_txid..")
+    r = req("settlement_set_txid", {"token": args.token, "txid": args.txid}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 if __name__ == "__main__":
     # parse arguments
     parser = construct_parser()
@@ -181,6 +206,10 @@ if __name__ == "__main__":
         function = merchanttx
     elif args.command == "rates":
         function = rates
+    elif args.command == "settlement":
+        function = settlement
+    elif args.command == "settlement_set_txid":
+        function = settlement_set_txid
     else:
         parser.print_help()
         sys.exit(EXIT_NO_COMMAND)

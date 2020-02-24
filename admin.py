@@ -3,7 +3,7 @@ import flask_admin
 from flask_admin import helpers as admin_helpers
 
 from app_core import app, db
-from models import security, RestrictedModelView, ApiKeyModelView, ClaimCodeRestrictedModelView, TxNotificationRestrictedModelView, MerchantTxRestrictedModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx
+from models import security, RestrictedModelView, ApiKeyModelView, ClaimCodeRestrictedModelView, TxNotificationRestrictedModelView, MerchantTxRestrictedModelView, SettlementRestrictedModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 
 # Create admin
 admin = flask_admin.Admin(
@@ -20,6 +20,7 @@ admin.add_view(ClaimCodeRestrictedModelView(ClaimCode, db.session))
 admin.add_view(TxNotificationRestrictedModelView(TxNotification, db.session))
 admin.add_view(ApiKeyModelView(ApiKey, db.session))
 admin.add_view(MerchantTxRestrictedModelView(MerchantTx, db.session))
+admin.add_view(SettlementRestrictedModelView(Settlement, db.session))
 
 # define a context processor for merging flask-admin's template context into the
 # flask-security views.

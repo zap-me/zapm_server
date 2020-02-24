@@ -9,7 +9,7 @@ from flask_security.utils import encrypt_password
 from flask_socketio import Namespace, emit, join_room, leave_room
 
 from app_core import app, db, socketio
-from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx
+from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
 from utils import check_hmac_auth
 from addresswatcher import AddressWatcher
@@ -96,7 +96,7 @@ def start_address_watcher():
 
 @app.context_processor
 def inject_rates():
-    return dict(merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"])
+    return dict(merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"], settlement_address=app.config["SETTLEMENT_ADDRESS"])
 
 @app.before_request
 def before_request_func():
@@ -259,8 +259,52 @@ def rates():
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return abort(400, reason)
-    rates = {"merchant": str(app.config["MERCHANT_RATE"]), "customer": str(app.config["CUSTOMER_RATE"])}
+    rates = {"merchant": str(app.config["MERCHANT_RATE"]), "customer": str(app.config["CUSTOMER_RATE"]), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
     return jsonify(rates)
+
+@app.route("/settlement", methods=["POST"])
+def settlement():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    bank_account = content["bank_account"]
+    amount = content["amount"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    amount_receive = amount * (1 - app.config["MERCHANT_RATE"])
+    amount_receive = int(amount_receive)
+    settlement = Settlement(api_key.user, bank_account, amount, amount_receive)
+    if settlement.any_this_month(db.session, api_key.user):
+        return abort(400, "Settlement already exists for this month")
+    db.session.add(settlement)
+    db.session.commit()
+    return jsonify(settlement.to_json())
+
+@app.route("/settlement_set_txid", methods=["POST"])
+def settlement_set_txid():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    token = content["token"]
+    txid = content["txid"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    settlement = Settlement.from_token(db.session, token)
+    if not settlement:
+        return abort(400, "Settlement not found")
+    if settlement.user != api_key.user:
+        return abort(400, "Settlement not found")
+    if settlement.txid:
+        return abort(400, "Transaction ID already set")
+    settlement.txid = txid
+    settlement.status = "awaiting_settlement"
+    db.session.add(settlement)
+    db.session.commit()
+    return jsonify(settlement.to_json())
 
 #
 # Public (customer) API
@@ -300,6 +344,11 @@ if __name__ == "__main__":
         if sys.argv[1] == "add_role":
             add_role(sys.argv[2], sys.argv[3])
     else:
+        # check config
+        if "SETTLEMENT_ADDRESS" not in app.config:
+            logger.error("SETTLEMENT_ADDRESS does not exist")
+            sys.exit(1)
+
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
         print("binding to port: %d" % port)

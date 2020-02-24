@@ -21,9 +21,12 @@
 {% if current_user.is_authenticated and current_user.has_role("admin") %}
 <div class="container">
     <small>
-        Current rates:<br/>
-        &nbsp;&nbsp;&nbsp;merchant: {{merchant_rate * 100}}%<br/>
-        &nbsp;&nbsp;&nbsp;customer: {{customer_rate * 100}}%
+        Current rates:
+        <ul>
+            <li>merchant: <code>{{merchant_rate * 100}}%</code></li>
+            <li>customer: <code>{{customer_rate * 100}}%</code></li>
+        </ul>
+        Settlement address: <code>{{settlement_address}}</code>
     </small>
 </div>
 {% endif %}

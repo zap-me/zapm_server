@@ -29,6 +29,8 @@ if os.getenv("MERCHANT_RATE"):
     app.config["MERCHANT_RATE"] = decimal.Decimal(os.getenv("MERCHANT_RATE"))
 else:
     app.config["MERCHANT_RATE"] = decimal.Decimal("0.05")
+if os.getenv("SETTLEMENT_ADDRESS"):
+    app.config["SETTLEMENT_ADDRESS"] = os.getenv("SETTLEMENT_ADDRESS")
 db = SQLAlchemy(app)
 mail = MailSendGrid(app)
 socketio = SocketIO(app)
