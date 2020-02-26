@@ -356,7 +356,7 @@ class Settlement(db.Model):
         next_month = now.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
         last_day_of_month = next_month - datetime.timedelta(days=next_month.day)
         month_end = last_day_of_month.replace(hour=23, minute=59, second=59, microsecond=999999)
-        return session.query(cls).filter(cls.date >= month_start, cls.date <= month_end).first()
+        return session.query(cls).filter(cls.user_id == user.id, cls.date >= month_start, cls.date <= month_end).first()
 
     def __repr__(self):
         return"<Settlement %r>" % (self.token)
@@ -431,17 +431,17 @@ class MerchantTxRestrictedModelView(BaseModelView):
     def get_count_query(self):
         return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
 
-class SettlementRestrictedModelView(BaseModelView):
+class SettlementAdminModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
     can_export = True
-    column_exclude_list = ['user']
-    column_export_exclude_list = ['user']
     column_filters = [ DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status') ]
 
     def is_accessible(self):
         if not current_user.is_active or not current_user.is_authenticated:
+            return False
+        if not current_user.has_role('admin'):
             return False
 
         return True
@@ -454,12 +454,20 @@ class SettlementRestrictedModelView(BaseModelView):
             return redirect(url_for('security.login', next=request.url))
         return False
 
+class SettlementRestrictedModelView(SettlementAdminModelView):
+    column_exclude_list = ['user']
+    column_export_exclude_list = ['user']
+
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+        if current_user.has_role('admin'):
+            return False
+
+        return True
+
     def get_query(self):
         return self.session.query(self.model).filter(self.model.user==current_user)
 
     def get_count_query(self):
         return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-    def on_model_change(self, form, model, is_created):
-        if is_created:
-            model.generate_defaults()
