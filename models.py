@@ -313,11 +313,18 @@ class SettlementSchema(Schema):
     token = fields.String()
     bank_account = fields.String()
     amount = fields.Integer()
+    settlement_address = fields.String()
     amount_receive = fields.Integer()
     txid = fields.String()
     status = fields.String()
 
 class Settlement(db.Model):
+    CREATED = "created"
+    SENT_ZAP = "sent_zap"
+    VALIDATED = "validated"
+    SENT_NZD = "sent_nzd"
+    ERROR = "error"
+
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime())
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -325,19 +332,21 @@ class Settlement(db.Model):
     token = db.Column(db.String(255), nullable=False, unique=True)
     bank_account = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Integer, nullable=False)
+    settlement_address = db.Column(db.String(255), nullable=False)
     amount_receive = db.Column(db.Integer, nullable=False)
     txid = db.Column(db.String(255))
     status = db.Column(db.String(255), nullable=False)
 
-    def __init__(self, user, bank_account, amount, amount_receive):
+    def __init__(self, user, bank_account, amount, settlement_address, amount_receive):
         self.date = datetime.datetime.now()
         self.user = user
         self.token = generate_key(4)
         self.bank_account = bank_account
         self.amount = amount
+        self.settlement_address = settlement_address
         self.amount_receive = amount_receive
         self.txid = None
-        self.status = "created"
+        self.status = Settlement.CREATED
 
     @classmethod
     def count(cls, session):
@@ -357,6 +366,10 @@ class Settlement(db.Model):
         last_day_of_month = next_month - datetime.timedelta(days=next_month.day)
         month_end = last_day_of_month.replace(hour=23, minute=59, second=59, microsecond=999999)
         return session.query(cls).filter(cls.user_id == user.id, cls.date >= month_start, cls.date <= month_end).first()
+
+    @classmethod
+    def all_sent_zap(cls, session):
+        return session.query(cls).filter(cls.status == cls.SENT_ZAP).all()
 
     def __repr__(self):
         return"<Settlement %r>" % (self.token)

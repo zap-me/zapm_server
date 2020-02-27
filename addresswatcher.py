@@ -60,3 +60,11 @@ class AddressWatcher(gevent.Greenlet):
 
     def watched(self):
         return self.addresses
+
+    def transfer_tx(self, txid):
+        url = self.url_base + "/transactions/transfer/" + txid
+        r = requests.get(url)
+        if r.status_code == 200:
+            body = r.json()
+            return body["data"]
+        return None
