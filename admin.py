@@ -3,7 +3,7 @@ import flask_admin
 from flask_admin import helpers as admin_helpers
 
 from app_core import app, db
-from models import security, RestrictedModelView, ApiKeyModelView, ClaimCodeRestrictedModelView, TxNotificationRestrictedModelView, MerchantTxRestrictedModelView, SettlementAdminModelView, SettlementRestrictedModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
+from models import security, RestrictedModelView, UserModelView, ApiKeyModelView, ClaimCodeRestrictedModelView, TxNotificationRestrictedModelView, MerchantTxRestrictedModelView, SettlementAdminModelView, SettlementRestrictedModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 
 # Create admin
 admin = flask_admin.Admin(
@@ -15,7 +15,7 @@ admin = flask_admin.Admin(
 
 # Add model views
 admin.add_view(RestrictedModelView(Role, db.session, category='Users'))
-admin.add_view(RestrictedModelView(User, db.session, category='Users'))
+admin.add_view(UserModelView(User, db.session, category='Users'))
 admin.add_view(ClaimCodeRestrictedModelView(ClaimCode, db.session, category='Reports'))
 admin.add_view(TxNotificationRestrictedModelView(TxNotification, db.session, category='Reports'))
 admin.add_view(ApiKeyModelView(ApiKey, db.session))
