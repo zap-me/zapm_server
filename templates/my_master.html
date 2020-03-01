@@ -19,7 +19,10 @@
 
 {% block tail %}
 {% if current_user.is_authenticated and current_user.has_role("admin") %}
+<br/>
+<br/>
 <div class="container">
+    <hr/>
     <small>
         Current rates:
         <ul>

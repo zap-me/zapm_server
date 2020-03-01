@@ -31,6 +31,10 @@ else:
     app.config["MERCHANT_RATE"] = decimal.Decimal("0.05")
 if os.getenv("SETTLEMENT_ADDRESS"):
     app.config["SETTLEMENT_ADDRESS"] = os.getenv("SETTLEMENT_ADDRESS")
+if os.getenv("SENDER_BANK_ACCOUNT"):
+    app.config["SENDER_BANK_ACCOUNT"] = os.getenv("SENDER_BANK_ACCOUNT")
+if os.getenv("SENDER_NAME"):
+    app.config["SENDER_NAME"] = os.getenv("SENDER_NAME")
 db = SQLAlchemy(app)
 mail = MailSendGrid(app)
 socketio = SocketIO(app)

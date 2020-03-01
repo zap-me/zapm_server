@@ -13,8 +13,9 @@ import base58
 from app_core import app, db, socketio
 from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
-from utils import check_hmac_auth
+from utils import check_hmac_auth, bankaccount_is_valid
 from addresswatcher import AddressWatcher
+import bnz_ib4b
 
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
@@ -280,6 +281,8 @@ def settlement():
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return abort(400, reason)
+    if not bankaccount_is_valid(bank_account):
+        return abort(400, "invalid bank account")
     amount_receive = amount * (1 - app.config["MERCHANT_RATE"])
     amount_receive = int(amount_receive)
     if Settlement.any_this_month(db.session, api_key.user):
@@ -396,6 +399,12 @@ if __name__ == "__main__":
         # check config
         if "SETTLEMENT_ADDRESS" not in app.config:
             logger.error("SETTLEMENT_ADDRESS does not exist")
+            sys.exit(1)
+        if "SENDER_BANK_ACCOUNT" not in app.config:
+            logger.error("SENDER_BANK_ACCOUNT does not exist")
+            sys.exit(1)
+        if "SENDER_NAME" not in app.config:
+            logger.error("SENDER_NAME does not exist")
             sys.exit(1)
 
         # Bind to PORT if defined, otherwise default to 5000.

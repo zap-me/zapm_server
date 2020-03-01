@@ -1,17 +1,19 @@
 import datetime
 from datetime import timezone
 
-from flask import redirect, url_for, request
+from flask import redirect, url_for, request, abort, flash
+from flask_admin import expose
+from flask_admin.actions import action
 from flask_admin.babel import lazy_gettext
-from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from flask_admin.model import filters
+from flask_admin.contrib import sqla
+from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
-from flask_admin.contrib import sqla
 from marshmallow import Schema, fields
 
 from app_core import app, db
-from utils import generate_key
+from utils import generate_key, ib4b_response
 
 # Define models
 roles_users = db.Table(
@@ -372,6 +374,14 @@ class Settlement(db.Model):
     def all_sent_zap(cls, session):
         return session.query(cls).filter(cls.status == cls.SENT_ZAP).all()
 
+    @classmethod
+    def all_validated(cls, session):
+        return session.query(cls).filter(cls.status == cls.VALIDATED).all()
+
+    @classmethod
+    def from_id_list(cls, session, ids):
+        return session.query(cls).filter(cls.id.in_(ids)).all()
+
     def __repr__(self):
         return"<Settlement %r>" % (self.token)
 
@@ -379,7 +389,7 @@ class Settlement(db.Model):
         schema = SettlementSchema()
         return schema.dump(self).data
 
-class ClaimCodeRestrictedModelView(BaseModelView):
+class ClaimCodeModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -404,7 +414,7 @@ class ClaimCodeRestrictedModelView(BaseModelView):
             return redirect(url_for('security.login', next=request.url))
         return False
 
-class TxNotificationRestrictedModelView(BaseModelView):
+class TxNotificationModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -418,7 +428,7 @@ class TxNotificationRestrictedModelView(BaseModelView):
             return True
         return False
 
-class MerchantTxRestrictedModelView(BaseModelView):
+class MerchantTxModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -451,6 +461,7 @@ class SettlementAdminModelView(BaseModelView):
     can_edit = False
     can_export = True
     column_filters = [ DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status') ]
+    list_template = 'settlement_list.html'
 
     def is_accessible(self):
         if not current_user.is_active or not current_user.is_authenticated:
@@ -468,7 +479,37 @@ class SettlementAdminModelView(BaseModelView):
             return redirect(url_for('security.login', next=request.url))
         return False
 
-class SettlementRestrictedModelView(SettlementAdminModelView):
+    @expose('/settle', methods=['GET', 'POST'])
+    def execute(self):
+        process = request.args.get('process', False, bool)
+        ids = request.args.get('ids')
+        if ids:
+            ids = [int(id_) for id_ in ids.split(',')]
+            settlements = Settlement.from_id_list(db.session, ids)
+        else:
+            settlements = Settlement.all_validated(db.session)
+        count = len(settlements)
+        if process and ids and request.method == 'POST':
+            for settlement in settlements:
+                settlement.status = Settlement.SENT_NZD
+                db.session.add(settlement)
+            db.session.commit()
+            flash('Settlements processed')
+            return redirect('')
+        ids = ','.join([str(settlement.id) for settlement in settlements])
+        return self.render('settle.html', count=count, settlements=settlements, ids=ids, process=process)
+
+    @expose('/ib4b')
+    def ib4b(self):
+        ids = request.args.get('ids')
+        if ids:
+            ids = [int(id_) for id_ in ids.split(',')]
+            settlements = Settlement.from_id_list(db.session, ids)
+        else:
+            abort(400)
+        return ib4b_response("bnz_batch.txt", settlements, app.config["SENDER_NAME"], app.config["SENDER_BANK_ACCOUNT"])
+
+class SettlementModelView(SettlementAdminModelView):
     column_exclude_list = ['user']
     column_export_exclude_list = ['user']
 
