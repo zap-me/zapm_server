@@ -44,6 +44,7 @@ class User(db.Model, UserMixin):
     confirmed_at = db.Column(db.DateTime())
     roles = db.relationship('Role', secondary=roles_users,
                             backref=db.backref('users', lazy='dynamic'))
+    max_settlements_per_month = db.Column(db.Integer)
 
     @classmethod
     def from_email(cls, session, email):
@@ -131,8 +132,8 @@ class UserModelView(BaseModelView):
     can_create = False
     can_delete = False
     can_edit = False
-    column_list = ['email', 'roles']
-    column_editable_list = ['roles']
+    column_list = ['email', 'roles', 'max_settlements_per_month']
+    column_editable_list = ['roles', 'max_settlements_per_month']
 
     def is_accessible(self):
         return (current_user.is_active and
@@ -360,7 +361,7 @@ class Settlement(db.Model):
         return session.query(cls).filter(cls.token == token).first()
 
     @classmethod
-    def any_this_month(cls, session, user):
+    def count_this_month(cls, session, user):
         now = datetime.datetime.now()
         # month start
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -368,7 +369,7 @@ class Settlement(db.Model):
         next_month = now.replace(day=28) + datetime.timedelta(days=4)  # this will never fail
         last_day_of_month = next_month - datetime.timedelta(days=next_month.day)
         month_end = last_day_of_month.replace(hour=23, minute=59, second=59, microsecond=999999)
-        return session.query(cls).filter(cls.user_id == user.id, cls.date >= month_start, cls.date <= month_end).first()
+        return session.query(cls).filter(cls.user_id == user.id, cls.date >= month_start, cls.date <= month_end).count()
 
     @classmethod
     def all_sent_zap(cls, session):

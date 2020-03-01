@@ -285,8 +285,10 @@ def settlement():
         return abort(400, "invalid bank account")
     amount_receive = amount * (1 - app.config["MERCHANT_RATE"])
     amount_receive = int(amount_receive)
-    if Settlement.any_this_month(db.session, api_key.user):
-        return abort(400, "Settlement already exists for this month")
+    count_this_month = Settlement.count_this_month(db.session, api_key.user)
+    max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
+    if count_this_month >= max_this_month:
+        return abort(400, "Settlement count max reached for this month")
     settlement = Settlement(api_key.user, bank_account, amount, app.config["SETTLEMENT_ADDRESS"], amount_receive)
     db.session.add(settlement)
     db.session.commit()
