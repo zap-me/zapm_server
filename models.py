@@ -392,6 +392,44 @@ class Settlement(db.Model):
         schema = SettlementSchema()
         return schema.dump(self).data
 
+class BankSchema(Schema):
+    account_number = fields.String()
+    account_name = fields.String()
+    account_holder_address = fields.String()
+    default_account = db.Column(db.Boolean())
+    bank_name = fields.String()
+
+class Bank(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('banks', lazy='dynamic'))
+    account_number = db.Column(db.String(255), nullable=False)
+    account_name = db.Column(db.String(255), nullable=False)
+    account_holder_address = db.Column(db.String(255), nullable=False)
+    default_account = db.Column(db.Boolean, nullable=False)
+    bank_name = db.Column(db.String(255), nullable=False)
+
+    def __init__(self, account_number, account_name, account_holder_address, default_account, bank_name):
+        self.account_name = account_name
+        self.account_holder_address = acount_holder_address
+        self.account_number = account_number
+        self.default_account = default_account
+        self.bank_name = bank_name
+
+    def generate_defaults(self):
+        self.user = current_user
+
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
+
+    @classmethod
+    def from_account_number(cls, session, account_number):
+        return session.query(cls).filter(cls.account_number == account_number).first()
+
+    def __repr__(self):
+        return "<Bank %r>" % (self.account_number)
+
 class ClaimCodeModelView(BaseModelView):
     can_create = False
     can_delete = False
@@ -572,3 +610,37 @@ class SettlementModelView(SettlementAdminModelView):
 
     def get_count_query(self):
         return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+class BankRestrictedModelView(BaseModelView):
+    can_create = True
+    can_delete = False
+    can_edit = False
+    can_export = True
+    column_list = ('account_number', 'account_name', 'account_holder_address', 'bank_name', 'default_account')
+    form_excluded_columns = ['user']
+    
+    def is_accessible(self):
+        if not current_user.is_active or not current_user.is_authenticated:
+            return False
+        if not current_user.has_role('admin') and not current_user.has_role('merchant'):
+            return False
+
+        return True
+
+    def get_query(self):
+        return self.session.query(self.model).filter(self.model.user==current_user)
+
+    def get_count_query(self):
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+    def handle_view(self, name, **kwargs):
+        if current_user.is_authenticated:
+            abort(403)
+        else:
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return False
+
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.generate_defaults()
