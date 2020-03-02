@@ -17,12 +17,14 @@ import base58
 from app_core import app, db, aw
 from utils import generate_key, ib4b_response
 
+#
 # Define models
+#
+
 roles_users = db.Table(
     'roles_users',
     db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
-    db.Column('role_id', db.Integer(), db.ForeignKey('role.id'))
-)
+    db.Column('role_id', db.Integer(), db.ForeignKey('role.id')))
 
 class Role(db.Model, RoleMixin):
     id = db.Column(db.Integer(), primary_key=True)
@@ -55,127 +57,40 @@ class User(db.Model, UserMixin):
     def __str__(self):
         return self.email
 
-# Setup Flask-Security
-user_datastore = SQLAlchemyUserDatastore(db, User, Role)
-security = Security(app, user_datastore)
+class BankSchema(Schema):
+    account_number = fields.String()
+    account_name = fields.String()
+    account_holder_address = fields.String()
+    default_account = db.Column(db.Boolean())
+    bank_name = fields.String()
 
-class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
-    def __init__(self, column, name, options=None, data_type=None):
-        super(DateBetweenFilter, self).__init__(column,
-                                                name,
-                                                options,
-                                                data_type='daterangepicker')
+class Bank(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', backref=db.backref('banks', lazy='dynamic'))
+    account_number = db.Column(db.String(255), nullable=False)
+    account_name = db.Column(db.String(255), nullable=False)
+    account_holder_address = db.Column(db.String(255), nullable=False)
+    default_account = db.Column(db.Boolean, nullable=False)
+    bank_name = db.Column(db.String(255), nullable=False)
 
-    def apply(self, query, value, alias=None):
-        start, end = value
-        return query.filter(self.get_column(alias).between(start, end))
+    def __init__(self, account_number, account_name, account_holder_address, default_account, bank_name):
+        self.account_name = account_name
+        self.account_holder_address = acount_holder_address
+        self.account_number = account_number
+        self.default_account = default_account
+        self.bank_name = bank_name
 
-class FilterEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) == value)
+    @classmethod
+    def count(cls, session):
+        return session.query(cls).count()
 
-    def operation(self):
-        return lazy_gettext('equals')
+    @classmethod
+    def from_account_number(cls, session, account_number):
+        return session.query(cls).filter(cls.account_number == account_number).first()
 
-class FilterNotEqual(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) != value)
-
-    def operation(self):
-        return lazy_gettext('not equal')
-
-class FilterGreater(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) > value)
-
-    def operation(self):
-        return lazy_gettext('greater than')
-
-class FilterSmaller(BaseSQLAFilter):
-    def apply(self, query, value, alias=None):
-        return query.filter(self.get_column(alias) < value)
-
-    def operation(self):
-        return lazy_gettext('smaller than')
-
-class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
-    pass
-
-class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
-    pass
-
-# Create customized model view classes
-class BaseModelView(sqla.ModelView):
-    def _handle_view(self, name, **kwargs):
-        """
-        Override builtin _handle_view in order to redirect users when a view is not accessible.
-        """
-        if not self.is_accessible():
-            if current_user.is_authenticated:
-                # permission denied
-                abort(403)
-            else:
-                # login
-                return redirect(url_for('security.login', next=request.url))
-
-class RestrictedModelView(BaseModelView):
-    can_create = False
-    can_delete = False
-    can_edit = False
-    column_exclude_list = ['password', 'secret']
-
-    def is_accessible(self):
-        return (current_user.is_active and
-                current_user.is_authenticated and
-                current_user.has_role('admin')
-        )
-
-class UserModelView(BaseModelView):
-    can_create = False
-    can_delete = False
-    can_edit = False
-    column_list = ['email', 'roles', 'max_settlements_per_month']
-    column_editable_list = ['roles', 'max_settlements_per_month']
-
-    def is_accessible(self):
-        return (current_user.is_active and
-                current_user.is_authenticated and
-                current_user.has_role('admin'))
-
-class ApiKeyModelView(BaseModelView):
-    can_create = True
-    can_delete = True
-    can_edit = False
-    column_list = ('date', 'name', 'token', 'secret')
-    form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
-
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-
-        return True
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
-
-    def get_query(self):
-        return self.session.query(self.model).filter(self.model.user==current_user)
-
-    def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-    def on_model_change(self, form, model, is_created):
-        if is_created:
-            model.generate_defaults()
-
-    def is_accessible(self):
-        return (current_user.is_active and
-                current_user.is_authenticated)
+    def __repr__(self):
+        return "<Bank %r>" % (self.account_number)
 
 class ClaimCodeSchema(Schema):
     date = fields.Float()
@@ -392,45 +307,111 @@ class Settlement(db.Model):
         schema = SettlementSchema()
         return schema.dump(self).data
 
-class BankSchema(Schema):
-    account_number = fields.String()
-    account_name = fields.String()
-    account_holder_address = fields.String()
-    default_account = db.Column(db.Boolean())
-    bank_name = fields.String()
+#
+# Setup Flask-Security
+#
 
-class Bank(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    user = db.relationship('User', backref=db.backref('banks', lazy='dynamic'))
-    account_number = db.Column(db.String(255), nullable=False)
-    account_name = db.Column(db.String(255), nullable=False)
-    account_holder_address = db.Column(db.String(255), nullable=False)
-    default_account = db.Column(db.Boolean, nullable=False)
-    bank_name = db.Column(db.String(255), nullable=False)
+user_datastore = SQLAlchemyUserDatastore(db, User, Role)
+security = Security(app, user_datastore)
 
-    def __init__(self, account_number, account_name, account_holder_address, default_account, bank_name):
-        self.account_name = account_name
-        self.account_holder_address = acount_holder_address
-        self.account_number = account_number
-        self.default_account = default_account
-        self.bank_name = bank_name
+#
+# Define model views
+#
 
-    def generate_defaults(self):
-        self.user = current_user
+class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
+    def __init__(self, column, name, options=None, data_type=None):
+        super(DateBetweenFilter, self).__init__(column,
+                                                name,
+                                                options,
+                                                data_type='daterangepicker')
 
-    @classmethod
-    def count(cls, session):
-        return session.query(cls).count()
+    def apply(self, query, value, alias=None):
+        start, end = value
+        return query.filter(self.get_column(alias).between(start, end))
 
-    @classmethod
-    def from_account_number(cls, session, account_number):
-        return session.query(cls).filter(cls.account_number == account_number).first()
+class FilterEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) == value)
 
-    def __repr__(self):
-        return "<Bank %r>" % (self.account_number)
+    def operation(self):
+        return lazy_gettext('equals')
 
-class ClaimCodeModelView(BaseModelView):
+class FilterNotEqual(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) != value)
+
+    def operation(self):
+        return lazy_gettext('not equal')
+
+class FilterGreater(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) > value)
+
+    def operation(self):
+        return lazy_gettext('greater than')
+
+class FilterSmaller(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) < value)
+
+    def operation(self):
+        return lazy_gettext('smaller than')
+
+class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
+    pass
+
+class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
+    pass
+
+class BaseModelView(sqla.ModelView):
+    def _handle_view(self, name, **kwargs):
+        """
+        Override builtin _handle_view in order to redirect users when a view is not accessible.
+        """
+        if not self.is_accessible():
+            if current_user.is_authenticated:
+                # permission denied
+                abort(403)
+            else:
+                # login
+                return redirect(url_for('security.login', next=request.url))
+
+class BaseOnlyUserOwnedModelView(BaseModelView):
+    def is_accessible(self):
+        return (current_user.is_active and
+                current_user.is_authenticated)
+
+    def get_query(self):
+        return self.session.query(self.model).filter(self.model.user==current_user)
+
+    def get_count_query(self):
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+
+class RestrictedModelView(BaseModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    column_exclude_list = ['password', 'secret']
+
+    def is_accessible(self):
+        return (current_user.is_active and
+                current_user.is_authenticated and
+                current_user.has_role('admin'))
+
+class UserModelView(RestrictedModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    column_list = ['email', 'roles', 'max_settlements_per_month']
+    column_editable_list = ['roles', 'max_settlements_per_month']
+
+class BankAdminModelView(RestrictedModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    can_export = True
+
+class ClaimCodeModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
@@ -439,86 +420,20 @@ class ClaimCodeModelView(BaseModelView):
     column_export_exclude_list = ['secret']
     column_filters = [ DateBetweenFilter(ClaimCode.date, 'Search Date'), DateTimeGreaterFilter(ClaimCode.date, 'Search Date'), DateSmallerFilter(ClaimCode.date, 'Search Date'), FilterEqual(ClaimCode.status, 'Search Status'), FilterNotEqual(ClaimCode.status, 'Search Status') ]
 
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-
-        if current_user.has_role('admin'):
-            return True
-        return False
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
-
-class TxNotificationModelView(BaseModelView):
+class TxNotificationModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
     can_export = True
     column_filters = [ DateBetweenFilter(TxNotification.date, 'Search Date'), DateTimeGreaterFilter(TxNotification.date, 'Search Date'), DateSmallerFilter(TxNotification.date, 'Search Date') ]
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
 
-        if current_user.has_role('admin'):
-            return True
-        return False
-
-class MerchantTxModelView(BaseModelView):
-    can_create = False
-    can_delete = False
-    can_edit = False
-    can_export = True
-    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
-
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-
-        return True
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
-
-    def get_query(self):
-        return self.session.query(self.model).filter(self.model.user==current_user)
-
-    def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-class SettlementAdminModelView(BaseModelView):
+class SettlementAdminModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
     can_export = True
     column_filters = [ DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status') ]
     list_template = 'settlement_list.html'
-
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-        if not current_user.has_role('admin'):
-            return False
-
-        return True
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
 
     def settlement_validated(self, settlement):
         if not settlement.txid:
@@ -593,54 +508,36 @@ class SettlementAdminModelView(BaseModelView):
             abort(400)
         return ib4b_response("bnz_batch.txt", settlements, app.config["SENDER_NAME"], app.config["SENDER_BANK_ACCOUNT"])
 
-class SettlementModelView(SettlementAdminModelView):
-    column_exclude_list = ['user']
-    column_export_exclude_list = ['user']
+class MerchantTxModelView(BaseOnlyUserOwnedModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
+    can_export = True
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
 
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-        if current_user.has_role('admin'):
-            return False
-
-        return True
-
-    def get_query(self):
-        return self.session.query(self.model).filter(self.model.user==current_user)
-
-    def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-class BankRestrictedModelView(BaseModelView):
+class BankModelView(BaseOnlyUserOwnedModelView):
     can_create = True
     can_delete = False
     can_edit = False
     can_export = True
-    column_list = ('account_number', 'account_name', 'account_holder_address', 'bank_name', 'default_account')
+    column_exclude_list = ['user']
     form_excluded_columns = ['user']
     
-    def is_accessible(self):
-        if not current_user.is_active or not current_user.is_authenticated:
-            return False
-        if not current_user.has_role('admin') and not current_user.has_role('merchant'):
-            return False
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.user = current_user
 
-        return True
-
-    def get_query(self):
-        return self.session.query(self.model).filter(self.model.user==current_user)
-
-    def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
-
-    def handle_view(self, name, **kwargs):
-        if current_user.is_authenticated:
-            abort(403)
-        else:
-            # login
-            return redirect(url_for('security.login', next=request.url))
-        return False
+class ApiKeyModelView(BaseOnlyUserOwnedModelView):
+    can_create = True
+    can_delete = True
+    can_edit = False
+    column_list = ('date', 'name', 'token', 'secret')
+    form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def on_model_change(self, form, model, is_created):
         if is_created:
             model.generate_defaults()
+
+class SettlementModelView(BaseOnlyUserOwnedModelView):
+    column_exclude_list = ['user']
+    column_export_exclude_list = ['user']

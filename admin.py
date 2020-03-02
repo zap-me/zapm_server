@@ -3,7 +3,7 @@ import flask_admin
 from flask_admin import helpers as admin_helpers
 
 from app_core import app, db
-from models import security, RestrictedModelView, UserModelView, ApiKeyModelView, ClaimCodeModelView, TxNotificationModelView, MerchantTxModelView, SettlementAdminModelView, SettlementModelView, BankRestrictedModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement, Bank
+from models import security, RestrictedModelView, UserModelView, BankAdminModelView, BankModelView, ApiKeyModelView, ClaimCodeModelView, TxNotificationModelView, MerchantTxModelView, SettlementAdminModelView, SettlementModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement, Bank
 
 # Create admin
 admin = flask_admin.Admin(
@@ -14,15 +14,16 @@ admin = flask_admin.Admin(
 )
 
 # Add model views
-admin.add_view(RestrictedModelView(Role, db.session, category='Users'))
-admin.add_view(UserModelView(User, db.session, category='Users'))
-admin.add_view(BankRestrictedModelView(Bank, db.session, category='Users'))
+admin.add_view(RestrictedModelView(Role, db.session, category='Admin'))
+admin.add_view(UserModelView(User, db.session, category='Admin'))
+admin.add_view(BankAdminModelView(Bank, db.session, category='Admin'))
+admin.add_view(SettlementAdminModelView(Settlement, db.session, category='Admin'))
 admin.add_view(ClaimCodeModelView(ClaimCode, db.session, category='Reports'))
 admin.add_view(TxNotificationModelView(TxNotification, db.session, category='Reports'))
-admin.add_view(ApiKeyModelView(ApiKey, db.session))
-admin.add_view(MerchantTxModelView(MerchantTx, db.session, category='Reports'))
-admin.add_view(SettlementAdminModelView(Settlement, db.session, category='Reports'))
-admin.add_view(SettlementModelView(Settlement, db.session, endpoint='SettlementUser', category='Reports'))
+admin.add_view(MerchantTxModelView(MerchantTx, db.session, category='Merchant'))
+admin.add_view(ApiKeyModelView(ApiKey, db.session, category='Merchant'))
+admin.add_view(BankModelView(Bank, db.session, endpoint='BankUser', category='Merchant'))
+admin.add_view(SettlementModelView(Settlement, db.session, endpoint='SettlementUser', category='Merchant'))
 
 # define a context processor for merging flask-admin's template context into the
 # flask-security views.
