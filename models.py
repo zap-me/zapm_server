@@ -10,13 +10,14 @@ from flask_admin.babel import lazy_gettext
 from flask_admin.model import filters
 from flask_admin.contrib import sqla
 from flask_admin.contrib.sqla.filters import BaseSQLAFilter
+from wtforms import ValidationError
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from marshmallow import Schema, fields
 import base58
 
 from app_core import app, db, aw
-from utils import generate_key, ib4b_response
+from utils import generate_key, ib4b_response, bankaccount_is_valid
 
 logger = logging.getLogger(__name__)
 
@@ -530,6 +531,12 @@ class BankModelView(BaseOnlyUserOwnedModelView):
     column_exclude_list = ['user']
     form_excluded_columns = ['user']
     column_editable_list = ['default_account']
+
+    def validate_bank_account(form, field):
+        if not bankaccount_is_valid(field.data):
+            raise ValidationError('invalid bank account')
+
+    form_args = dict(account_number=dict(validators=[validate_bank_account]))
 
     def on_model_change(self, form, model, is_created):
         if is_created:
