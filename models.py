@@ -1,6 +1,7 @@
 import datetime
 from datetime import timezone
 import decimal
+import logging
 
 from flask import redirect, url_for, request, abort, flash
 from flask_admin import expose
@@ -16,6 +17,8 @@ import base58
 
 from app_core import app, db, aw
 from utils import generate_key, ib4b_response
+
+logger = logging.getLogger(__name__)
 
 #
 # Define models
@@ -80,6 +83,10 @@ class Bank(db.Model):
         self.account_number = account_number
         self.default_account = default_account
         self.bank_name = bank_name
+
+    def ensure_default_account_exclusive(self, session):
+        if self.default_account:
+            session.query(Bank).filter(Bank.user_id == self.user_id, Bank.id != self.id).update(dict(default_account=False))
 
     @classmethod
     def count(cls, session):
@@ -522,10 +529,15 @@ class BankModelView(BaseOnlyUserOwnedModelView):
     can_export = True
     column_exclude_list = ['user']
     form_excluded_columns = ['user']
-    
+    column_editable_list = ['default_account']
+
     def on_model_change(self, form, model, is_created):
         if is_created:
             model.user = current_user
+
+    def after_model_change(self, form, model, is_created):
+        model.ensure_default_account_exclusive(db.session)
+        db.session.commit()
 
 class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     can_create = True
