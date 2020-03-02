@@ -6,6 +6,8 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_mail_sendgrid import MailSendGrid
 from flask_socketio import SocketIO
 
+from addresswatcher import AddressWatcher
+
 # Create Flask application
 app = Flask(__name__)
 app.config.from_pyfile("config.py")
@@ -13,6 +15,9 @@ if os.getenv("DEBUG"):
     app.config["DEBUG"] = True
 if os.getenv("DEBUG_REQUESTS"):
     app.config["DEBUG_REQUESTS"] = True
+app.config["TESTNET"] = True
+if os.getenv("PRODUCTION"):
+    app.config["TESTNET"] = False
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 if os.getenv("SESSION_KEY"):
@@ -38,3 +43,5 @@ if os.getenv("SENDER_NAME"):
 db = SQLAlchemy(app)
 mail = MailSendGrid(app)
 socketio = SocketIO(app)
+
+aw = AddressWatcher(app.config["TESTNET"])

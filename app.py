@@ -3,24 +3,20 @@ import os
 import logging
 import sys
 import json
-import decimal
 
 from flask import url_for, redirect, render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
 from flask_socketio import Namespace, emit, join_room, leave_room
-import base58
 
-from app_core import app, db, socketio
+from app_core import app, db, socketio, aw
 from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
 from utils import check_hmac_auth, bankaccount_is_valid
-from addresswatcher import AddressWatcher
 import bnz_ib4b
 
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
 ws_sids = {}
-aw = None
 
 #
 # Helper functions
@@ -93,10 +89,8 @@ def transfer_tx_callback(api_keys, tx):
 
 @app.before_first_request
 def start_address_watcher():
-    global aw
-    if aw is None:
-        aw = AddressWatcher(transfer_tx_callback, True)
-        aw.start()
+    aw.transfer_tx_callback = transfer_tx_callback
+    aw.start()
 
 #
 # Flask views
@@ -317,46 +311,6 @@ def settlement_set_txid():
     db.session.add(settlement)
     db.session.commit()
     return jsonify(settlement.to_json())
-
-def settlement_validated(settlement):
-    if not settlement.txid:
-        return None
-    tx = aw.transfer_tx(settlement.txid)
-    if not tx:
-        return None
-    if tx["recipient"] != settlement.settlement_address:
-        logger.error("settlement (%s) tx recipient is not correct" % (settlement.token, tx["recipient"]))
-        return False
-    if tx["assetId"] != aw.asset_id:
-        return False
-        logger.error("settlement (%s) tx asset ID (%s) is not correct" % (settlement.token, tx["assetId"]))
-    amount = int(decimal.Decimal(tx["amount"]) * 100)
-    if amount != settlement.amount:
-        logger.error("settlement (%s) tx amount (%d) is not correct" % (settlement.token, amount))
-        return False
-    if not tx["attachment"]:
-        logger.error("settlement (%s) tx attachment is empty" % settlement.token)
-        return False
-    attachment = base58.b58decode(tx["attachment"]).decode("utf-8")
-    if attachment != settlement.token:
-        logger.error("settlement (%s) tx attachment (%s) is not correct" % (settlement.token, attachment))
-        return False
-    return True
-
-@app.route("/settlement_check")
-def settlement_check():
-    settlements = Settlement.all_sent_zap(db.session)
-    for settlement in settlements:
-        res = settlement_validated(settlement)
-        if res == None:
-            continue
-        if res:
-            settlement.status = Settlement.VALIDATED
-        else:
-            settlement.status = Settlement.ERROR
-        db.session.add(settlement)
-    db.session.commit()
-    return "ok"
 
 #
 # Public (customer) API

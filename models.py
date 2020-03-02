@@ -1,5 +1,6 @@
 import datetime
 from datetime import timezone
+import decimal
 
 from flask import redirect, url_for, request, abort, flash
 from flask_admin import expose
@@ -11,8 +12,9 @@ from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from marshmallow import Schema, fields
+import base58
 
-from app_core import app, db
+from app_core import app, db, aw
 from utils import generate_key, ib4b_response
 
 # Define models
@@ -479,6 +481,49 @@ class SettlementAdminModelView(BaseModelView):
             # login
             return redirect(url_for('security.login', next=request.url))
         return False
+
+    def settlement_validated(self, settlement):
+        if not settlement.txid:
+            return None
+        tx = aw.transfer_tx(settlement.txid)
+        if not tx:
+            return None
+        if tx["recipient"] != settlement.settlement_address:
+            logger.error("settlement (%s) tx recipient is not correct" % (settlement.token, tx["recipient"]))
+            return False
+        if tx["assetId"] != aw.asset_id:
+            return False
+            logger.error("settlement (%s) tx asset ID (%s) is not correct" % (settlement.token, tx["assetId"]))
+        amount = int(decimal.Decimal(tx["amount"]) * 100)
+        if amount != settlement.amount:
+            logger.error("settlement (%s) tx amount (%d) is not correct" % (settlement.token, amount))
+            return False
+        if not tx["attachment"]:
+            logger.error("settlement (%s) tx attachment is empty" % settlement.token)
+            return False
+        attachment = base58.b58decode(tx["attachment"]).decode("utf-8")
+        if attachment != settlement.token:
+            logger.error("settlement (%s) tx attachment (%s) is not correct" % (settlement.token, attachment))
+            return False
+        return True
+
+    @expose("/validate")
+    def validate(self):
+        count = 0
+        settlements = Settlement.all_sent_zap(db.session)
+        for settlement in settlements:
+            res = self.settlement_validated(settlement)
+            if res == None:
+                continue
+            if res:
+                settlement.status = Settlement.VALIDATED
+            else:
+                settlement.status = Settlement.ERROR
+            count += 1
+            db.session.add(settlement)
+        db.session.commit()
+        flash('%d Settlements validated' % count)
+        return redirect('./')
 
     @expose('/settle', methods=['GET', 'POST'])
     def execute(self):

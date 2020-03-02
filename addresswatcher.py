@@ -7,10 +7,10 @@ class AddressWatcher(gevent.Greenlet):
 
     addresses = {}
 
-    def __init__(self, transfer_tx_callback, testnet=True):
+    def __init__(self, testnet=True):
         gevent.Greenlet.__init__(self)
 
-        self.transfer_tx_callback = transfer_tx_callback
+        self.transfer_tx_callback = None
         self.testnet = testnet
         if testnet:
             self.url_base = "https://api-test.wavesplatform.com/v0"
@@ -39,7 +39,8 @@ class AddressWatcher(gevent.Greenlet):
                     tx = tx["data"]
                     if tx["recipient"] in self.addresses:
                         api_keys = self.addresses[tx["recipient"]]
-                        self.transfer_tx_callback(api_keys, tx)
+                        if self.transfer_tx_callback:
+                            self.transfer_tx_callback(api_keys, tx)
                 if "lastCursor" in body:
                     after = body["lastCursor"]
                 if "isLastPage" in body:
