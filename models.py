@@ -67,7 +67,7 @@ class BankSchema(Schema):
     account_name = fields.String()
     account_holder_address = fields.String()
     bank_name = fields.String()
-    default_account = db.Column(db.Boolean())
+    default_account = fields.Bool()
 
 class Bank(db.Model):
     id = db.Column(db.Integer, primary_key=True)
