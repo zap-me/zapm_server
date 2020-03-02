@@ -63,10 +63,14 @@ def construct_parser():
     parser_rates.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_rates.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
 
+    parser_banks = subparsers.add_parser("banks", help="Get the bank accounts for the user")
+    parser_banks.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_banks.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+
     parser_settlement = subparsers.add_parser("settlement", help="Create a settlement")
     parser_settlement.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_settlement.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
-    parser_settlement.add_argument("bank_account", metavar="BANK_ACCOUNT", type=int, help="the bank account to settle to")
+    parser_settlement.add_argument("bank_token", metavar="BANK_TOKEN", type=int, help="the token of the bank account to settle to")
     parser_settlement.add_argument("amount", metavar="AMOUNT", type=int, help="the zap settlement amount (integer, lowest denomination of asset)")
 
     parser_settlement_set_txid = subparsers.add_parser("settlement_set_txid", help="Update a settlement with a txid")
@@ -173,9 +177,15 @@ def rates(args):
     check_request_status(r)
     print(r.text)
 
+def banks(args):
+    print(":: calling banks..")
+    r = req("banks", {}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 def settlement(args):
     print(":: calling settlement..")
-    r = req("settlement", {"bank_account": args.bank_account, "amount": args.amount}, args.api_key_token, args.api_key_secret)
+    r = req("settlement", {"bank": args.bank_token, "amount": args.amount}, args.api_key_token, args.api_key_secret)
     check_request_status(r)
     print(r.text)
 
@@ -206,6 +216,8 @@ if __name__ == "__main__":
         function = merchanttx
     elif args.command == "rates":
         function = rates
+    elif args.command == "banks":
+        function = banks
     elif args.command == "settlement":
         function = settlement
     elif args.command == "settlement_set_txid":

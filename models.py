@@ -62,28 +62,35 @@ class User(db.Model, UserMixin):
         return self.email
 
 class BankSchema(Schema):
+    token = fields.String()
     account_number = fields.String()
     account_name = fields.String()
     account_holder_address = fields.String()
-    default_account = db.Column(db.Boolean())
     bank_name = fields.String()
+    default_account = db.Column(db.Boolean())
 
 class Bank(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('banks', lazy='dynamic'))
+    token = db.Column(db.String(255), unique=True, nullable=False)
     account_number = db.Column(db.String(255), nullable=False)
     account_name = db.Column(db.String(255), nullable=False)
     account_holder_address = db.Column(db.String(255), nullable=False)
-    default_account = db.Column(db.Boolean, nullable=False)
     bank_name = db.Column(db.String(255), nullable=False)
+    default_account = db.Column(db.Boolean, nullable=False)
 
-    def __init__(self, account_number, account_name, account_holder_address, default_account, bank_name):
+    def __init__(self, token, account_number, account_name, account_holder_address, bank_name, default_account):
+        self.account_number = account_number
         self.account_name = account_name
         self.account_holder_address = acount_holder_address
-        self.account_number = account_number
-        self.default_account = default_account
         self.bank_name = bank_name
+        self.default_account = default_account
+        self.generate_defaults()
+
+    def generate_defaults(self):
+        self.user = current_user
+        self.token = generate_key(4)
 
     def ensure_default_account_exclusive(self, session):
         if self.default_account:
@@ -94,11 +101,19 @@ class Bank(db.Model):
         return session.query(cls).count()
 
     @classmethod
-    def from_account_number(cls, session, account_number):
-        return session.query(cls).filter(cls.account_number == account_number).first()
+    def from_token(cls, session, token):
+        return session.query(cls).filter(cls.token == token).first()
+
+    @classmethod
+    def from_user(cls, session, user):
+        return session.query(cls).filter(cls.user_id == user.id).all()
 
     def __repr__(self):
-        return "<Bank %r>" % (self.account_number)
+        return self.account_number
+
+    def to_json(self):
+        schema = BankSchema()
+        return schema.dump(self).data
 
 class ClaimCodeSchema(Schema):
     date = fields.Float()
@@ -259,18 +274,19 @@ class Settlement(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     user = db.relationship('User', backref=db.backref('settlements', lazy='dynamic'))
     token = db.Column(db.String(255), nullable=False, unique=True)
-    bank_account = db.Column(db.String(255), nullable=False)
+    bank_id = db.Column(db.Integer, db.ForeignKey('bank.id'), nullable=False)
+    bank = db.relationship('Bank', backref=db.backref('settlements', lazy='dynamic'))
     amount = db.Column(db.Integer, nullable=False)
     settlement_address = db.Column(db.String(255), nullable=False)
     amount_receive = db.Column(db.Integer, nullable=False)
     txid = db.Column(db.String(255))
     status = db.Column(db.String(255), nullable=False)
 
-    def __init__(self, user, bank_account, amount, settlement_address, amount_receive):
+    def __init__(self, user, bank, amount, settlement_address, amount_receive):
         self.date = datetime.datetime.now()
         self.user = user
         self.token = generate_key(4)
-        self.bank_account = bank_account
+        self.bank = bank
         self.amount = amount
         self.settlement_address = settlement_address
         self.amount_receive = amount_receive
@@ -528,8 +544,8 @@ class BankModelView(BaseOnlyUserOwnedModelView):
     can_delete = False
     can_edit = False
     can_export = True
-    column_exclude_list = ['user']
-    form_excluded_columns = ['user']
+    column_exclude_list = ['user', 'token', 'settlements']
+    form_excluded_columns = ['user', 'token', 'settlements']
     column_editable_list = ['default_account']
 
     def validate_bank_account(form, field):
@@ -540,7 +556,7 @@ class BankModelView(BaseOnlyUserOwnedModelView):
 
     def on_model_change(self, form, model, is_created):
         if is_created:
-            model.user = current_user
+            model.generate_defaults()
 
     def after_model_change(self, form, model, is_created):
         model.ensure_default_account_exclusive(db.session)
@@ -558,5 +574,8 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
             model.generate_defaults()
 
 class SettlementModelView(BaseOnlyUserOwnedModelView):
+    can_create = False
+    can_delete = False
+    can_edit = False
     column_exclude_list = ['user']
     column_export_exclude_list = ['user']

@@ -9,9 +9,9 @@ from flask_security.utils import encrypt_password
 from flask_socketio import Namespace, emit, join_room, leave_room
 
 from app_core import app, db, socketio, aw
-from models import security, user_datastore, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
+from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
-from utils import check_hmac_auth, bankaccount_is_valid
+from utils import check_hmac_auth
 import bnz_ib4b
 
 logger = logging.getLogger(__name__)
@@ -264,18 +264,32 @@ def rates():
     rates = {"merchant": str(app.config["MERCHANT_RATE"]), "customer": str(app.config["CUSTOMER_RATE"]), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
     return jsonify(rates)
 
+@app.route("/banks", methods=["POST"])
+def banks():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    banks = Bank.from_user(db.session, api_key.user)
+    banks = [bank.to_json() for bank in banks]
+    return jsonify(banks)
+
 @app.route("/settlement", methods=["POST"])
 def settlement():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
     nonce = content["nonce"]
-    bank_account = content["bank_account"]
+    bank = content["bank"]
     amount = content["amount"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return abort(400, reason)
-    if not bankaccount_is_valid(bank_account):
+    bank = Bank.from_token(db.session, bank)
+    if not bank or bank.user != api_key.user:
         return abort(400, "invalid bank account")
     amount_receive = amount * (1 - app.config["MERCHANT_RATE"])
     amount_receive = int(amount_receive)
@@ -283,7 +297,7 @@ def settlement():
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
     if count_this_month >= max_this_month:
         return abort(400, "Settlement count max reached for this month")
-    settlement = Settlement(api_key.user, bank_account, amount, app.config["SETTLEMENT_ADDRESS"], amount_receive)
+    settlement = Settlement(api_key.user, bank, amount, app.config["SETTLEMENT_ADDRESS"], amount_receive)
     db.session.add(settlement)
     db.session.commit()
     return jsonify(settlement.to_json())
