@@ -12,3 +12,4 @@ gevent-websocket==0.10.1
 werkzeug==0.16.1
 base58==2.0.0
 python-stdnum==1.12
+qrcode==6.1

@@ -2,6 +2,7 @@ import datetime
 from datetime import timezone
 import decimal
 import logging
+import io
 
 from flask import redirect, url_for, request, abort, flash
 from flask_admin import expose
@@ -14,7 +15,10 @@ from wtforms import ValidationError
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from marshmallow import Schema, fields
+from markupsafe import Markup
 import base58
+import qrcode
+import qrcode.image.svg
 
 from app_core import app, db, aw
 from utils import generate_key, ib4b_response, bankaccount_is_valid
@@ -566,8 +570,19 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     can_create = True
     can_delete = True
     can_edit = False
-    column_list = ('date', 'name', 'token', 'secret')
+    column_list = ('date', 'name', 'token', 'secret', 'QRCode')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
+
+    def _format_qrcode(view, context, model, name):
+        data = 'zapm_apikey:%s?secret=%s' % (model.token, model.secret)
+        factory = qrcode.image.svg.SvgPathImage
+        img = qrcode.make(data, image_factory=factory)
+        output = io.BytesIO()
+        img.save(output)
+        svg = output.getvalue().decode('utf-8')
+        return Markup(svg)
+
+    column_formatters = {'QRCode': _format_qrcode}
 
     def on_model_change(self, form, model, is_created):
         if is_created:
