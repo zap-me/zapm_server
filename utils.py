@@ -41,8 +41,8 @@ def ib4b_response(filename, settlements, sender_name, sender_bank_account):
     # process settlements
     txs = []
     for settlement in settlements:
-        bank_account = settlement.bank_account.replace('-', '')
-        tx = (settlement.bank_account, settlement.amount_receive, "zap settlement", settlement.token, settlement.user, "zap settlement", settlement.token)
+        bank_account = settlement.bank.account_number.replace('-', '')
+        tx = (bank_account, settlement.amount_receive, "zap settlement", settlement.token, settlement.user, "zap settlement", settlement.token)
         txs.append(tx)
     sender_bank_account = sender_bank_account.replace('-', '')
     bnz_ib4b.write_txs(output, "", sender_bank_account, sender_name, txs)
