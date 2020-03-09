@@ -261,7 +261,9 @@ def rates():
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return abort(400, reason)
-    rates = {"merchant": str(app.config["MERCHANT_RATE"]), "customer": str(app.config["CUSTOMER_RATE"]), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
+    merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
+    customer_rate = api_key.user.customer_rate if api_key.user.customer_rate else app.config["CUSTOMER_RATE"]
+    rates = {"merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
     return jsonify(rates)
 
 @app.route("/banks", methods=["POST"])
@@ -291,7 +293,8 @@ def settlement():
     bank = Bank.from_token(db.session, bank)
     if not bank or bank.user != api_key.user:
         return abort(400, "invalid bank account")
-    amount_receive = amount * (1 - app.config["MERCHANT_RATE"])
+    merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
+    amount_receive = amount * (1 - merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1

@@ -57,6 +57,8 @@ class User(db.Model, UserMixin):
     roles = db.relationship('Role', secondary=roles_users,
                             backref=db.backref('users', lazy='dynamic'))
     max_settlements_per_month = db.Column(db.Integer)
+    merchant_rate = db.Column(db.Numeric)
+    customer_rate = db.Column(db.Numeric)
 
     @classmethod
     def from_email(cls, session, email):
@@ -430,8 +432,8 @@ class UserModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
-    column_list = ['email', 'roles', 'max_settlements_per_month']
-    column_editable_list = ['roles', 'max_settlements_per_month']
+    column_list = ['email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
 
 class BankAdminModelView(RestrictedModelView):
     can_create = False
