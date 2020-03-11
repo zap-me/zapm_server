@@ -593,13 +593,31 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def _format_qrcode(view, context, model, name):
-        data = 'zapm_apikey:%s?secret=%s' % (model.token, model.secret)
+        data = 'zapm_apikey:%s?secret=%s&name=%s' % (model.token, model.secret, model.name)
         factory = qrcode.image.svg.SvgPathImage
         img = qrcode.make(data, image_factory=factory)
         output = io.BytesIO()
         img.save(output)
         svg = output.getvalue().decode('utf-8')
-        return Markup(svg)
+        modal = '''
+<div id="modal_%s" class="modal fade" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">x</button>
+        <h4>Api Key QR Code</h4>
+      </div>
+      <div class="modal-body" style="text-align: center">
+        %s
+      </div>
+    </div>
+  </div>
+</div>''' % (model.token, svg)
+        
+        link = '<a href="#" data-keyboard="true" data-toggle="modal" data-target="#modal_%s"><img src="/static/qrcode.svg"/></a>' % model.token
+        html = '%s %s' % (modal, link)
+        return Markup(html)
 
     column_formatters = dict(QRCode=_format_qrcode)
 
