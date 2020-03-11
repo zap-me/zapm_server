@@ -48,8 +48,8 @@ class Role(db.Model, RoleMixin):
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
-    first_name = db.Column(db.String(255))
-    last_name = db.Column(db.String(255))
+    merchant_name = db.Column(db.String(255))
+    merchant_code = db.Column(db.String(255), unique=True)
     email = db.Column(db.String(255), unique=True)
     password = db.Column(db.String(255))
     active = db.Column(db.Boolean())
@@ -60,12 +60,20 @@ class User(db.Model, UserMixin):
     merchant_rate = db.Column(db.Numeric)
     customer_rate = db.Column(db.Numeric)
 
+    def __init__(self, **kwargs):
+        self.merchant_code = generate_key(4)
+        super().__init__(**kwargs)
+
     @classmethod
     def from_email(cls, session, email):
         return session.query(cls).filter(cls.email == email).first()
 
+    @classmethod
+    def all(cls, session):
+        return session.query(cls).all()
+
     def __str__(self):
-        return self.email
+        return '%s (%s)' % (self.merchant_code, self.merchant_name)
 
 class BankSchema(Schema):
     token = fields.String()
@@ -393,6 +401,12 @@ class DateTimeGreaterFilter(FilterGreater, filters.BaseDateTimeFilter):
 class DateSmallerFilter(FilterSmaller, filters.BaseDateFilter):
     pass
 
+def _format_amount(view, context, model, name):
+    if name == 'amount':
+        return Markup(model.amount / 100)
+    if name == 'amount_receive':
+        return Markup(model.amount_receive / 100)
+
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
         """
@@ -432,8 +446,8 @@ class UserModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
-    column_list = ['email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
-    column_editable_list = ['roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
 
 class BankAdminModelView(RestrictedModelView):
     can_create = False
@@ -462,8 +476,11 @@ class SettlementAdminModelView(RestrictedModelView):
     can_delete = False
     can_edit = False
     can_export = True
-    column_filters = [ DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status') ]
+    column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status')]
     list_template = 'settlement_list.html'
+
+    column_formatters = dict(amount=_format_amount, amount_receive=_format_amount)
+    column_labels = dict(amount='ZAP Amount', amount_receive='NZD Amount')
 
     def settlement_validated(self, settlement):
         if not settlement.txid:
@@ -584,7 +601,7 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
         svg = output.getvalue().decode('utf-8')
         return Markup(svg)
 
-    column_formatters = {'QRCode': _format_qrcode}
+    column_formatters = dict(QRCode=_format_qrcode)
 
     def on_model_change(self, form, model, is_created):
         if is_created:
@@ -596,3 +613,6 @@ class SettlementModelView(BaseOnlyUserOwnedModelView):
     can_edit = False
     column_exclude_list = ['user']
     column_export_exclude_list = ['user']
+
+    column_formatters = dict(amount=_format_amount, amount_receive=_format_amount)
+    column_labels = dict(amount='ZAP Amount', amount_receive='NZD Amount')

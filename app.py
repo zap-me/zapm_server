@@ -11,7 +11,7 @@ from flask_socketio import Namespace, emit, join_room, leave_room
 from app_core import app, db, socketio, aw
 from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
-from utils import check_hmac_auth
+from utils import check_hmac_auth, generate_key
 import bnz_ib4b
 
 logger = logging.getLogger(__name__)
@@ -63,6 +63,14 @@ def add_role(email, role_name):
             user.roles.append(role)
         else:
             logger.info("user already has role")
+        db.session.commit()
+
+def add_merchant_codes():
+    with app.app_context():
+        for user in User.all(db.session):
+            if not user.merchant_code:
+                user.merchant_code = generate_key(4)
+                db.session.add(user)
         db.session.commit()
 
 def check_auth(api_key_token, nonce, sig, body):
@@ -368,6 +376,8 @@ if __name__ == "__main__":
             add_user(sys.argv[2], sys.argv[3])
         if sys.argv[1] == "add_role":
             add_role(sys.argv[2], sys.argv[3])
+        if sys.argv[1] == "add_merchant_codes":
+            add_merchant_codes()
     else:
         # check config
         if "SETTLEMENT_ADDRESS" not in app.config:

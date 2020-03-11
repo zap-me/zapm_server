@@ -20,10 +20,11 @@
 <div class="col-lg-12">
     <strong>Token: {{settlement.token}}, Status: {{settlement.status}}</strong>
     <ul>
-        <li>Date: {{settlement.date}}
-        <li>User: {{settlement.user}}
-        <li>Bank Account: {{settlement.bank_account}}
-        <li>Amount Receive: {{settlement.amount_receive}} cents
+        <li>Date: {{settlement.date}}</li>
+        <li>User: {{settlement.user}}</li>
+        <li>Merchant: {{settlement.user.merchant_name}} (code: {{settlement.user.merchant_code}})</li>
+        <li>Bank Account: {{settlement.bank_account}}</li>
+        <li>NZD Amount: {{settlement.amount_receive / 100}}</li>
     </ul>
 </div>
 {% endfor %}
