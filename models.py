@@ -59,6 +59,7 @@ class User(db.Model, UserMixin):
     max_settlements_per_month = db.Column(db.Integer)
     merchant_rate = db.Column(db.Numeric)
     customer_rate = db.Column(db.Numeric)
+    wallet_address = db.Column(db.String(255))
 
     def __init__(self, **kwargs):
         self.merchant_code = generate_key(4)
@@ -200,6 +201,7 @@ class ApiKey(db.Model):
     token = db.Column(db.String(255), unique=True, nullable=False)
     nonce = db.Column(db.Integer, nullable=False)
     secret = db.Column(db.String(255), nullable=False)
+    account_admin = db.Column(db.Boolean, nullable=False)
 
     def __init__(self, name):
         self.name = name
@@ -219,6 +221,10 @@ class ApiKey(db.Model):
     @classmethod
     def from_token(cls, session, token):
         return session.query(cls).filter(cls.token == token).first()
+
+    @classmethod
+    def admin_exists(cls, session):
+        return session.query(cls).filter(cls.account_admin == True).first()
 
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
@@ -446,7 +452,7 @@ class UserModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate', 'wallet_address']
     column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
 
 class BankAdminModelView(RestrictedModelView):
@@ -589,11 +595,13 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     can_create = True
     can_delete = True
     can_edit = False
-    column_list = ('date', 'name', 'token', 'secret', 'QRCode')
+    column_list = ('date', 'name', 'token', 'secret', 'QRCode', 'account_admin')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
 
     def _format_qrcode(view, context, model, name):
-        data = 'zapm_apikey:%s?secret=%s&name=%s' % (model.token, model.secret, model.name)
+        admin = model.account_admin if model.account_admin else False
+        address = model.user.wallet_address if model.user.wallet_address else ''
+        data = 'zapm_apikey:%s?secret=%s&name=%s&admin=%r&address=%s' % (model.token, model.secret, model.name, admin, address)
         factory = qrcode.image.svg.SvgPathImage
         img = qrcode.make(data, image_factory=factory)
         output = io.BytesIO()
@@ -623,6 +631,9 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
 
     def on_model_change(self, form, model, is_created):
         if is_created:
+            with db.session.no_autoflush:
+                if form.account_admin.data and ApiKey.admin_exists(db.session):
+                    raise ValidationError('Account admin already exists')
             model.generate_defaults()
 
 class SettlementModelView(BaseOnlyUserOwnedModelView):

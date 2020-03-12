@@ -18,19 +18,27 @@
 {% endblock %}
 
 {% block tail %}
-{% if current_user.is_authenticated and current_user.has_role("admin") %}
+{% if current_user.is_authenticated %}
 <br/>
 <br/>
 <div class="container">
-    <hr/>
-    <small>
-        General rates:
-        <ul>
-            <li>merchant: <code>{{merchant_rate * 100}}%</code></li>
-            <li>customer: <code>{{customer_rate * 100}}%</code></li>
-        </ul>
-        Settlement address: <code>{{settlement_address}}</code>
-    </small>
+    {% if current_user.has_role("admin") %}
+        <hr/>
+        <small>
+            General rates:
+            <ul>
+                <li>merchant: <code>{{merchant_rate * 100}}%</code></li>
+                <li>customer: <code>{{customer_rate * 100}}%</code></li>
+            </ul>
+            Settlement address: <code>{{settlement_address}}</code>
+        </small>
+    {% endif %}
+    {% if current_user.wallet_address %}
+        <hr/>
+        <small>
+            Wallet address: <code>{{current_user.wallet_address}}</code>
+        </small>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}

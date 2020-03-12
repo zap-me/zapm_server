@@ -59,6 +59,11 @@ def construct_parser():
     parser_merchanttx.add_argument("direction", metavar="DIRECTION", type=int, help="0 (in), 1 (out)")
     parser_merchanttx.add_argument("category", metavar="CATEGORY", type=str, help="payment/rebate/etc")
 
+    parser_wallet_address = subparsers.add_parser("wallet_address", help="Set the user wallet address")
+    parser_wallet_address.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
+    parser_wallet_address.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
+    parser_wallet_address.add_argument("wallet_address", metavar="WALLET_ADDRESS", type=str, help="the wallet address")
+
     parser_rates = subparsers.add_parser("rates", help="Get the rates")
     parser_rates.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_rates.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
@@ -177,6 +182,12 @@ def rates(args):
     check_request_status(r)
     print(r.text)
 
+def wallet_address(args):
+    print(":: calling wallet_address..")
+    r = req("wallet_address", {"address": args.wallet_address}, args.api_key_token, args.api_key_secret)
+    check_request_status(r)
+    print(r.text)
+
 def banks(args):
     print(":: calling banks..")
     r = req("banks", {}, args.api_key_token, args.api_key_secret)
@@ -216,6 +227,8 @@ if __name__ == "__main__":
         function = merchanttx
     elif args.command == "rates":
         function = rates
+    elif args.command == "wallet_address":
+        function = wallet_address
     elif args.command == "banks":
         function = banks
     elif args.command == "settlement":

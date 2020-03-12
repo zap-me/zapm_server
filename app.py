@@ -260,6 +260,25 @@ def merchanttx():
     db.session.commit()
     return jsonify(merchant_tx.to_json())
 
+@app.route("/wallet_address", methods=["POST"])
+def wallet_address():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    address = content["address"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return abort(400, reason)
+    if not api_key.account_admin:
+        return abort(400, "not account admin")
+    if api_key.user.wallet_address:
+        return abort(400, "wallet address already set")
+    api_key.user.wallet_address = address
+    db.session.add(api_key.user)
+    db.session.commit()
+    return "ok"
+
 @app.route("/rates", methods=["POST"])
 def rates():
     sig = request.headers.get("X-Signature")
