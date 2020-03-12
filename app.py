@@ -302,7 +302,7 @@ def settlement():
     if not bank or bank.user != api_key.user:
         return abort(400, "invalid bank account")
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
-    amount_receive = amount * (1 - merchant_rate)
+    amount_receive = amount / (1 + merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
