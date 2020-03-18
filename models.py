@@ -223,8 +223,8 @@ class ApiKey(db.Model):
         return session.query(cls).filter(cls.token == token).first()
 
     @classmethod
-    def admin_exists(cls, session):
-        return session.query(cls).filter(cls.account_admin == True).first()
+    def admin_exists(cls, session, user):
+        return session.query(cls).filter(cls.user == user, cls.account_admin == True).first()
 
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
@@ -632,7 +632,7 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     def on_model_change(self, form, model, is_created):
         if is_created:
             with db.session.no_autoflush:
-                if form.account_admin.data and ApiKey.admin_exists(db.session):
+                if form.account_admin.data and ApiKey.admin_exists(db.session, current_user):
                     raise ValidationError('Account admin already exists')
             model.generate_defaults()
 
