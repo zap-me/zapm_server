@@ -100,6 +100,11 @@ def start_address_watcher():
     aw.transfer_tx_callback = transfer_tx_callback
     aw.start()
 
+def bad_request(message):
+    response = jsonify({"message": message})
+    response.status_code = 400
+    return response
+
 #
 # Flask views
 #
@@ -206,7 +211,7 @@ def watch():
     addr = content["address"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     aw.watch(addr, api_key.token)
     return "ok"
 
@@ -220,7 +225,7 @@ def register():
     amount = content["amount"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     claim_code = ClaimCode(api_key.user, token, amount)
     db.session.add(claim_code)
     db.session.commit()
@@ -235,7 +240,7 @@ def check():
     token = content["token"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     claim_code = ClaimCode.from_token(db.session, token)
     if claim_code and claim_code.user == api_key.user:
         return jsonify(claim_code.to_json())
@@ -254,7 +259,7 @@ def merchanttx():
     category = content["category"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     merchant_tx = MerchantTx(api_key.user, wallet_address, amount, txid, direction, category)
     db.session.add(merchant_tx)
     db.session.commit()
@@ -269,11 +274,11 @@ def wallet_address():
     address = content["address"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     if not api_key.account_admin:
-        return abort(400, "not account admin")
+        return bad_request("not account admin")
     if api_key.user.wallet_address:
-        return abort(400, "wallet address already set")
+        return bad_request("wallet address already set")
     api_key.user.wallet_address = address
     db.session.add(api_key.user)
     db.session.commit()
@@ -287,7 +292,7 @@ def rates():
     nonce = content["nonce"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
     customer_rate = api_key.user.customer_rate if api_key.user.customer_rate else app.config["CUSTOMER_RATE"]
     rates = {"merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
@@ -301,7 +306,7 @@ def banks():
     nonce = content["nonce"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     banks = Bank.from_user(db.session, api_key.user)
     banks = [bank.to_json() for bank in banks]
     return jsonify(banks)
@@ -316,17 +321,17 @@ def settlement():
     amount = content["amount"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     bank = Bank.from_token(db.session, bank)
     if not bank or bank.user != api_key.user:
-        return abort(400, "invalid bank account")
+        return bad_request("invalid bank account")
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
     amount_receive = amount / (1 + merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
     if count_this_month >= max_this_month:
-        return abort(400, "Settlement count max reached for this month")
+        return bad_request("Settlement count max reached for this month")
     settlement = Settlement(api_key.user, bank, amount, app.config["SETTLEMENT_ADDRESS"], amount_receive)
     db.session.add(settlement)
     db.session.commit()
@@ -342,14 +347,14 @@ def settlement_set_txid():
     txid = content["txid"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
-        return abort(400, reason)
+        return bad_request(reason)
     settlement = Settlement.from_token(db.session, token)
     if not settlement:
-        return abort(400, "Settlement not found")
+        return bad_request("Settlement not found")
     if settlement.user != api_key.user:
-        return abort(400, "Settlement not found")
+        return bad_request("Settlement not found")
     if settlement.txid:
-        return abort(400, "Transaction ID already set")
+        return bad_request("Transaction ID already set")
     settlement.txid = txid
     settlement.status = Settlement.SENT_ZAP
     db.session.add(settlement)
@@ -377,7 +382,7 @@ def claim():
             db.session.commit()
             return jsonify(claim_code.to_json())
         else:
-            return abort(400, "already claimed")
+            return bad_request("already claimed")
     return abort(404)
 
 if __name__ == "__main__":
