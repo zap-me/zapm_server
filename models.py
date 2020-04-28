@@ -3,6 +3,7 @@ from datetime import timezone
 import decimal
 import logging
 import io
+import json
 
 from flask import redirect, url_for, request, abort, flash
 from flask_admin import expose
@@ -21,7 +22,7 @@ import qrcode
 import qrcode.image.svg
 
 from app_core import app, db, aw
-from utils import generate_key, ib4b_response, bankaccount_is_valid
+from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +236,7 @@ class MerchantTxSchema(Schema):
     amount = fields.Integer()
     txid = fields.String()
     direction = fields.Integer()
-    category = fields.String()
+    device_name = fields.String()
 
 class MerchantTx(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -244,18 +245,24 @@ class MerchantTx(db.Model):
     user = db.relationship('User', backref=db.backref('merchanttxs', lazy='dynamic'))
     wallet_address = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Integer)
-    txid = db.Column(db.String(255), nullable=False)
+    txid = db.Column(db.String(255), nullable=False, unique=True)
     direction = db.Column(db.Boolean, nullable=False)
-    category = db.Column(db.String(255), nullable=False)
+    category = db.Column(db.String(255))
+    attachment = db.Column(db.String(255))
+    device_name = db.Column(db.String(255))
 
-    def __init__(self, user, wallet_address, amount, txid, direction, category):
-        self.date = datetime.datetime.now()
+    def __init__(self, user, date, wallet_address, amount, txid, direction, attachment):
+        self.date = date
         self.user = user
         self.wallet_address = wallet_address
         self.amount = amount
         self.txid = txid
         self.direction = direction
-        self.category = category
+        self.attachment = attachment
+        try:
+            self.device_name = json.loads(attachment)['device_name']
+        except:
+            pass
 
     @classmethod
     def count(cls, session):
@@ -264,6 +271,32 @@ class MerchantTx(db.Model):
     @classmethod
     def from_txid(cls, session, txid):
         return session.query(cls).filter(cls.txid == txid).first()
+
+    @classmethod
+    def oldest_txid(cls, session, user):
+        last =  session.query(cls).filter(cls.user_id == user.id).order_by(cls.id.desc()).first()
+        if last:
+            return last.txid
+        return None
+
+    @classmethod
+    def update_wallet_address(cls, session, user):
+        if user.wallet_address:
+            # get oldest txid
+            oldest_txid = MerchantTx.oldest_txid(session, user)
+            # update txs
+            limit = 100
+            initial = True
+            txs = []
+            while initial or len(txs) >= limit:
+                txs = blockchain_transactions(app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
+                for tx in txs:
+                    oldest_txid = tx["id"]
+                    if tx["assetId"] == app.config["ASSET_ID"]:
+                        date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
+                        session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], tx['id'], tx['direction'], tx['attachment']))
+                initial = False
+            session.commit()
 
     def __repr__(self):
         return"<MerchantTx %r>" % (self.txid)

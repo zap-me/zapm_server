@@ -50,14 +50,9 @@ def construct_parser():
     parser_claim.add_argument("secret", metavar="SECRET", type=str, help="the claim code secret")
     parser_claim.add_argument("address", metavar="ADDR", type=str, help="the claim code address")
 
-    parser_merchanttx = subparsers.add_parser("merchanttx", help="Log merchant transaction")
+    parser_merchanttx = subparsers.add_parser("merchanttx", help="Update merchant tx table")
     parser_merchanttx.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
     parser_merchanttx.add_argument("api_key_secret", metavar="API_KEY_SECRET", type=str, help="the API KEY secret")
-    parser_merchanttx.add_argument("wallet_address", metavar="WALLETADDR", type=str, help="Customers wallet address")
-    parser_merchanttx.add_argument("amount", metavar="AMOUNT", type=int, help="the transaction amount (integer, lowest denomination of asset)")
-    parser_merchanttx.add_argument("txid", metavar="TXID", type=str, help="Customers Transaction ID")
-    parser_merchanttx.add_argument("direction", metavar="DIRECTION", type=int, help="0 (in), 1 (out)")
-    parser_merchanttx.add_argument("category", metavar="CATEGORY", type=str, help="payment/rebate/etc")
 
     parser_wallet_address = subparsers.add_parser("wallet_address", help="Set the user wallet address")
     parser_wallet_address.add_argument("api_key_token", metavar="API_KEY_TOKEN", type=str, help="the API KEY token")
@@ -172,7 +167,7 @@ def claim(args):
 
 def merchanttx(args):
     print(":: calling merchanttx..")
-    r = req("merchanttx", {"amount": args.amount, "wallet_address": args.wallet_address, "direction": args.direction, "txid": args.txid, "category": args.category}, args.api_key_token, args.api_key_secret)
+    r = req("merchanttx", {}, args.api_key_token, args.api_key_secret)
     check_request_status(r)
     print(r.text)
 

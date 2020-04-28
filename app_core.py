@@ -16,8 +16,12 @@ if os.getenv("DEBUG"):
 if os.getenv("DEBUG_REQUESTS"):
     app.config["DEBUG_REQUESTS"] = True
 app.config["TESTNET"] = True
+app.config["ASSET_ID"] = "CgUrFtinLXEbJwJVjwwcppk4Vpz1nMmR3H5cQaDcUcfe"
+app.config["NODE_ADDRESS"] = "http://testnodes.wavesnodes.com"
 if os.getenv("PRODUCTION"):
     app.config["TESTNET"] = False
+    app.config["ASSET_ID"] = "9R3iLi4qGLVWKc16Tg98gmRvgg1usGEYd7SgC1W5D6HB"
+    app.config["NODE_ADDRESS"] = "http://nodes.wavesnodes.com"
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 if os.getenv("SESSION_KEY"):

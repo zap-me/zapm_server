@@ -252,18 +252,11 @@ def merchanttx():
     content = request.json
     api_key = content["api_key"]
     nonce = content["nonce"]
-    wallet_address = content["wallet_address"]
-    amount = content["amount"]
-    txid = content["txid"]
-    direction = content["direction"]
-    category = content["category"]
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return bad_request(reason)
-    merchant_tx = MerchantTx(api_key.user, wallet_address, amount, txid, direction, category)
-    db.session.add(merchant_tx)
-    db.session.commit()
-    return jsonify(merchant_tx.to_json())
+    MerchantTx.update_wallet_address(db.session, api_key.user)
+    return "ok"
 
 @app.route("/wallet_address", methods=["POST"])
 def wallet_address():

@@ -5,6 +5,8 @@ import hashlib
 import base64
 import io
 
+import requests
+import base58
 from flask import make_response
 from stdnum.nz import bankaccount
 import bnz_ib4b
@@ -51,3 +53,23 @@ def ib4b_response(filename, settlements, sender_name, sender_bank_account):
     resp.headers['Content-Type'] = "application/octet-stream"
     resp.headers['Content-Disposition'] = "inline; filename=%s" % filename
     return resp
+
+def blockchain_transactions(node, wallet_address, limit, after=None):
+    url = '%s/transactions/address/%s/limit/%s' % (node, wallet_address, limit)
+    if after:
+        url += '?after=%s' % after
+    print(':: requesting %s..' % url)
+    r = requests.get(url)
+    if r.status_code != 200:
+        print('ERROR: status code is %d' % r.status_code)
+        sys.exit(1)
+    txs = r.json()[0]
+    print(':: retrieved %d records' % len(txs))
+    txs_result = []
+    for tx in txs:
+        attachment = tx['attachment']
+        if attachment:
+            tx['attachment'] = base58.b58decode(attachment).decode('utf-8')
+        tx['direction'] = tx['recipient'] == wallet_address
+        txs_result.append(tx)
+    return txs_result
