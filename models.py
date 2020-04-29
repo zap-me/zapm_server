@@ -600,6 +600,13 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     can_edit = False
     can_export = True
     column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
+    list_template = 'merchanttx_list.html'
+
+    @expose("/update")
+    def update(self):
+        MerchantTx.update_wallet_address(db.session, current_user)
+        flash('Updated')
+        return redirect('./')
 
 class BankModelView(BaseOnlyUserOwnedModelView):
     can_create = True

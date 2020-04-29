@@ -70,6 +70,6 @@ def blockchain_transactions(node, wallet_address, limit, after=None):
         attachment = tx['attachment']
         if attachment:
             tx['attachment'] = base58.b58decode(attachment).decode('utf-8')
-        tx['direction'] = tx['recipient'] == wallet_address
+        tx['direction'] = tx['recipient'] == wallet_address and tx['sender'] != wallet_address
         txs_result.append(tx)
     return txs_result
