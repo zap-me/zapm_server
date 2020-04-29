@@ -62,14 +62,17 @@ def blockchain_transactions(node, wallet_address, limit, after=None):
     r = requests.get(url)
     if r.status_code != 200:
         print('ERROR: status code is %d' % r.status_code)
-        sys.exit(1)
     txs = r.json()[0]
     print(':: retrieved %d records' % len(txs))
     txs_result = []
     for tx in txs:
-        attachment = tx['attachment']
-        if attachment:
-            tx['attachment'] = base58.b58decode(attachment).decode('utf-8')
-        tx['direction'] = tx['recipient'] == wallet_address and tx['sender'] != wallet_address
+        if 'attachment' in tx:
+            attachment = tx['attachment']
+            if attachment:
+                tx['attachment'] = base58.b58decode(attachment).decode('utf-8')
+        if 'recipient' in tx:
+            tx['direction'] = tx['recipient'] == wallet_address and tx['sender'] != wallet_address
+        else:
+            tx['direction'] = False
         txs_result.append(tx)
     return txs_result

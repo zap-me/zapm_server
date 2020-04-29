@@ -280,22 +280,29 @@ class MerchantTx(db.Model):
         return None
 
     @classmethod
+    def exists(cls, session, txid):
+        return session.query(cls).filter(cls.txid == txid).scalar() is not None
+
+    @classmethod
     def update_wallet_address(cls, session, user):
         if user.wallet_address:
-            # get oldest txid
-            oldest_txid = MerchantTx.oldest_txid(session, user)
             # update txs
             limit = 100
-            initial = True
+            oldest_txid = None
             txs = []
-            while initial or len(txs) >= limit:
+            while True:
+                have_tx = False
                 txs = blockchain_transactions(app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
                 for tx in txs:
                     oldest_txid = tx["id"]
-                    if tx["assetId"] == app.config["ASSET_ID"]:
+                    have_tx = MerchantTx.exists(db.session, oldest_txid)
+                    if have_tx:
+                        break
+                    if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
                         date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
                         session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], tx['id'], tx['direction'], tx['attachment']))
-                initial = False
+                if have_tx or len(txs) < limit:
+                    break
             session.commit()
 
     def __repr__(self):
@@ -599,7 +606,9 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     can_delete = False
     can_edit = False
     can_export = True
-    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.category, 'Search Category'), FilterNotEqual(MerchantTx.category, 'Search Category') ]
+    column_default_sort = ('date', True)
+    column_exclude_list = ['user', 'wallet_address']
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.device_name, 'Search Device Name'), FilterNotEqual(MerchantTx.device_name, 'Search Device Name') ]
     list_template = 'merchanttx_list.html'
 
     @expose("/update")
