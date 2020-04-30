@@ -613,8 +613,11 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
 
     @expose("/update")
     def update(self):
-        MerchantTx.update_wallet_address(db.session, current_user)
-        flash('Updated')
+        if not current_user.wallet_address:
+            flash('Account does not have wallet address set')
+        else:
+            MerchantTx.update_wallet_address(db.session, current_user)
+            flash('Updated')
         return redirect('./')
 
 class BankModelView(BaseOnlyUserOwnedModelView):
