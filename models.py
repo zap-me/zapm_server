@@ -285,6 +285,7 @@ class MerchantTx(db.Model):
 
     @classmethod
     def update_wallet_address(cls, session, user):
+        print('user wallet address: %s' % user.wallet_address)
         if user.wallet_address:
             # update txs
             limit = 100
@@ -293,6 +294,7 @@ class MerchantTx(db.Model):
             while True:
                 have_tx = False
                 txs = blockchain_transactions(app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
+                print('got %s txs' % len(txs))
                 for tx in txs:
                     oldest_txid = tx["id"]
                     have_tx = MerchantTx.exists(db.session, oldest_txid)
@@ -615,7 +617,8 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     def update(self):
         MerchantTx.update_wallet_address(db.session, current_user)
         flash('Updated')
-        return redirect('./')
+        return 'ok'
+        #return redirect('./')
 
 class BankModelView(BaseOnlyUserOwnedModelView):
     can_create = True

@@ -15,6 +15,11 @@ if os.getenv("DEBUG"):
     app.config["DEBUG"] = True
 if os.getenv("DEBUG_REQUESTS"):
     app.config["DEBUG_REQUESTS"] = True
+if os.getenv("DEBUG_SQL"):
+    print("DEBUG_SQL: %s" % os.getenv("DEBUG_SQL"))
+    app.config["SQLALCHEMY_ECHO"] = True
+else:
+    app.config["SQLALCHEMY_ECHO"] = False
 app.config["TESTNET"] = True
 app.config["ASSET_ID"] = "CgUrFtinLXEbJwJVjwwcppk4Vpz1nMmR3H5cQaDcUcfe"
 app.config["NODE_ADDRESS"] = "http://testnodes.wavesnodes.com"
