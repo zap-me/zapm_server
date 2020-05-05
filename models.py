@@ -453,6 +453,16 @@ def _format_amount(view, context, model, name):
     if name == 'amount_receive':
         return Markup(model.amount_receive / 100)
 
+class FilterByDeviceName(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(MerchantTx.device_name == value)
+
+    def operation(self):
+        return u'equals'
+
+    def get_options(self, view):
+        return [(merchant_tx.device_name, merchant_tx.device_name) for merchant_tx in MerchantTx.query.with_entities(MerchantTx.device_name.distinct().label('device_name'))]
+
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
         """
@@ -608,7 +618,7 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     can_export = True
     column_default_sort = ('date', True)
     column_exclude_list = ['user', 'wallet_address']
-    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterEqual(MerchantTx.device_name, 'Search Device Name'), FilterNotEqual(MerchantTx.device_name, 'Search Device Name') ]
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterByDeviceName(MerchantTx.device_name, 'Search Device Name') ]
     list_template = 'merchanttx_list.html'
 
     @expose("/update")
