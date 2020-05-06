@@ -5,7 +5,7 @@ import logging
 import io
 import json
 
-from flask import redirect, url_for, request, abort, flash
+from flask import redirect, url_for, request, abort, flash, has_app_context, g
 from flask_admin import expose
 from flask_admin.actions import action
 from flask_admin.babel import lazy_gettext
@@ -453,6 +453,21 @@ def _format_amount(view, context, model, name):
     if name == 'amount_receive':
         return Markup(model.amount_receive / 100)
 
+def get_device_names():
+    if has_app_context():
+        if not hasattr(g, 'device_names'):
+            query = db.session.query(MerchantTx.device_name.distinct().label('device_name')).filter(MerchantTx.user_id == current_user.id)
+            g.device_names = [row.device_name for row in query.all()]
+        for device_name in g.device_names:
+            yield device_name, device_name
+
+class ReloadingIterator:
+    def __init__(self, iterator_factory):
+        self.iterator_factory = iterator_factory
+
+    def __iter__(self):
+        return self.iterator_factory()
+
 class FilterByDeviceName(BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(MerchantTx.device_name == value)
@@ -461,7 +476,9 @@ class FilterByDeviceName(BaseSQLAFilter):
         return u'equals'
 
     def get_options(self, view):
-        return [(merchant_tx.device_name, merchant_tx.device_name) for merchant_tx in MerchantTx.query.with_entities(MerchantTx.device_name.distinct().label('device_name'))]
+        # This will return a generator which is reloaded every time it is used.
+        # Without this we need to restart the server to update the cache of device names.
+        return ReloadingIterator(get_device_names)
 
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
