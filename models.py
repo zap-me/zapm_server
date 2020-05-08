@@ -263,6 +263,10 @@ class MerchantTx(db.Model):
             self.device_name = json.loads(attachment)['device_name']
         except:
             pass
+        try:
+            self.category = json.loads(attachment)['category']
+        except:
+            pass
 
     @classmethod
     def count(cls, session):
@@ -461,6 +465,20 @@ def get_device_names():
         for device_name in g.device_names:
             yield device_name, device_name
 
+def get_categories():
+    if has_app_context():
+        if not hasattr(g, 'categories'):
+            query = db.session.query(MerchantTx.category.distinct().label('category')).filter(MerchantTx.user_id == current_user.id, MerchantTx.category != None)
+            g.categories = [row.category for row in query.all()]
+        for category in g.categories:
+            yield category, category
+
+def _format_direction(view, context, model, name):
+    if model.direction == 0:
+        return Markup('out')
+    elif model.direction == 1:
+        return Markup('in')
+
 class ReloadingIterator:
     def __init__(self, iterator_factory):
         self.iterator_factory = iterator_factory
@@ -479,6 +497,18 @@ class FilterByDeviceName(BaseSQLAFilter):
         # This will return a generator which is reloaded every time it is used.
         # Without this we need to restart the server to update the cache of device names.
         return ReloadingIterator(get_device_names)
+
+class FilterByCategory(BaseSQLAFilter):
+    def apply(self, query, value):
+        return query.filter(MerchantTx.category == value)
+
+    def operation(self):
+        return u'equals'
+
+    def get_options(self, view):
+        # This will return a generator which is reloaded every time it is used.
+        # Without this we need to restart the server to update the cache of device names.
+        return ReloadingIterator(get_categories)
 
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
@@ -635,7 +665,8 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     can_export = True
     column_default_sort = ('date', True)
     column_exclude_list = ['user', 'wallet_address']
-    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterByDeviceName(MerchantTx.device_name, 'Search Device Name') ]
+    column_formatters = {'amount':_format_amount, 'direction':_format_direction}
+    column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterByDeviceName(MerchantTx.device_name, 'Search Device Name'), FilterByCategory(MerchantTx.category, 'Search Category') ]
     list_template = 'merchanttx_list.html'
 
     @expose("/update")
