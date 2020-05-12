@@ -90,10 +90,12 @@ def transfer_tx_callback(api_keys, tx):
     for api_key in api_keys:
         print("sending 'claimed' event to room %s" % api_key)
         socketio.emit("tx", txt, json=True, room=api_key)
-        api_key = ApiKey.from_token(db.session, api_key)
-        txnoti = TxNotification(api_key.user, tx["id"])
-        db.session.add(txnoti)
-        db.session.commit()
+        if not TxNotification.exists(db.session, tx["id"]):
+            print("adding to tx notification table")
+            api_key = ApiKey.from_token(db.session, api_key)
+            txnoti = TxNotification(api_key.user, tx["id"])
+            db.session.add(txnoti)
+            db.session.commit()
 
 @app.before_first_request
 def start_address_watcher():

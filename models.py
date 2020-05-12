@@ -187,6 +187,10 @@ class TxNotification(db.Model):
         self.txid = txid
 
     @classmethod
+    def exists(cls, session, txid):
+        return session.query(cls).filter(cls.txid == txid).first()
+
+    @classmethod
     def count(cls, session):
         return session.query(cls).count()
 
