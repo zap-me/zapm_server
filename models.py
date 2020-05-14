@@ -11,6 +11,7 @@ from flask_admin.actions import action
 from flask_admin.babel import lazy_gettext
 from flask_admin.model import filters
 from flask_admin.contrib import sqla
+from sqlalchemy import and_
 from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from wtforms import ValidationError
 from flask_security import Security, SQLAlchemyUserDatastore, \
@@ -249,11 +250,12 @@ class MerchantTx(db.Model):
     user = db.relationship('User', backref=db.backref('merchanttxs', lazy='dynamic'))
     wallet_address = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Integer)
-    txid = db.Column(db.String(255), nullable=False, unique=True)
+    txid = db.Column(db.String(255), nullable=False)
     direction = db.Column(db.Boolean, nullable=False)
     category = db.Column(db.String(255))
     attachment = db.Column(db.String(255))
     device_name = db.Column(db.String(255))
+    __table_args__ = (db.UniqueConstraint('user_id', 'txid', name='user_txid_uc'),)
 
     def __init__(self, user, date, wallet_address, amount, txid, direction, attachment):
         self.date = date
@@ -288,8 +290,8 @@ class MerchantTx(db.Model):
         return None
 
     @classmethod
-    def exists(cls, session, txid):
-        return session.query(cls).filter(cls.txid == txid).scalar() is not None
+    def exists(cls, session, user, txid):
+        return session.query(cls).filter(and_(cls.user_id == user.id), (cls.txid == txid)).scalar()
 
     @classmethod
     def update_wallet_address(cls, session, user):
@@ -303,7 +305,7 @@ class MerchantTx(db.Model):
                 txs = blockchain_transactions(app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
                 for tx in txs:
                     oldest_txid = tx["id"]
-                    have_tx = MerchantTx.exists(db.session, oldest_txid)
+                    have_tx = MerchantTx.exists(db.session, user, oldest_txid)
                     if have_tx:
                         break
                     if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
