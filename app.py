@@ -3,10 +3,13 @@ import os
 import logging
 import sys
 import json
+import time
+import requests
 
 from flask import url_for, redirect, render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
 from flask_socketio import Namespace, emit, join_room, leave_room
+from flask_security import current_user
 
 from app_core import app, db, socketio, aw
 from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
@@ -17,6 +20,7 @@ import bnz_ib4b
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
 ws_sids = {}
+wallet_balances = {}
 
 #
 # Helper functions
@@ -97,6 +101,38 @@ def transfer_tx_callback(api_keys, tx):
             db.session.add(txnoti)
             db.session.commit()
 
+def get_balance(wallet_address):
+    url = '%s/assets/balance/%s/%s' % (app.config["NODE_ADDRESS"], wallet_address, app.config["ASSET_ID"])
+    print(':: getting balance - %s' % url)
+    r = requests.get(url)
+    print(':: balance request status - %d' % r.status_code)
+    if r.status_code == 200:
+        balance = r.json()['balance'] / 100
+        return balance
+    return -1
+
+# get the wallet balance, or update/create it if it does not exist or has expired
+def get_update_balance(wallet_address):
+    now = time.time()
+    if wallet_address in wallet_balances:
+        timestamp, balance = wallet_balances[wallet_address]
+        # check if balance has expired
+        if now - timestamp > 60 * 10:
+            # update balance and timestamp
+            balance = get_balance(wallet_address)
+            wallet_balances[wallet_address] = (now, balance)
+            # return new balance
+            return balance
+        else:
+            # return cached balance
+            return balance
+    else:
+        # initial balance and timestamp
+        balance = get_balance(wallet_address)
+        wallet_balances[wallet_address] = (now, balance)
+        # return initial balance
+        return balance
+
 @app.before_first_request
 def start_address_watcher():
     aw.transfer_tx_callback = transfer_tx_callback
@@ -120,6 +156,10 @@ def before_request_func():
     if "DEBUG_REQUESTS" in app.config:
         print("URL: %s" % request.url)
         print(request.headers)
+
+    if not current_user.is_anonymous:
+        if current_user.wallet_address:
+            current_user.wallet_balance = get_update_balance(current_user.wallet_address)
 
 @app.route("/")
 def index():
