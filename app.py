@@ -102,8 +102,10 @@ def transfer_tx_callback(api_keys, tx):
             db.session.commit()
 
 def get_balance(wallet_address):
-    url = '%s/assets1/balance/%s/%s' % (app.config["NODE_ADDRESS"], wallet_address, app.config["ASSET_ID"])
+    url = '%s/assets/balance/%s/%s' % (app.config["NODE_ADDRESS"], wallet_address, app.config["ASSET_ID"])
+    print(':: getting balance - %s' % url)
     r = requests.get(url)
+    print(':: balance request status - %d' % r.status_code)
     if r.status_code == 200:
         balance = r.json()['balance'] / 100
         return balance
