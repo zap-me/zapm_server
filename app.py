@@ -92,7 +92,7 @@ def transfer_tx_callback(api_keys, tx):
     txt = json.dumps(tx)
     print("transfer_tx_callback: tx %s" % txt)
     for api_key in api_keys:
-        print("sending 'claimed' event to room %s" % api_key)
+        print("sending 'tx' event to room %s" % api_key)
         socketio.emit("tx", txt, json=True, room=api_key)
         if not TxNotification.exists(db.session, tx["id"]):
             print("adding to tx notification table")
