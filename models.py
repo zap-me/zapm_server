@@ -239,6 +239,7 @@ class MerchantTxSchema(Schema):
     date = fields.Float()
     wallet_address = fields.String()
     amount = fields.Integer()
+    amount_nzd = fields.Integer()
     txid = fields.String()
     direction = fields.Integer()
     device_name = fields.String()
@@ -250,6 +251,7 @@ class MerchantTx(db.Model):
     user = db.relationship('User', backref=db.backref('merchanttxs', lazy='dynamic'))
     wallet_address = db.Column(db.String(255), nullable=False)
     amount = db.Column(db.Integer)
+    amount_nzd = db.Column(db.Integer)
     txid = db.Column(db.String(255), nullable=False)
     direction = db.Column(db.Boolean, nullable=False)
     category = db.Column(db.String(255))
@@ -257,11 +259,12 @@ class MerchantTx(db.Model):
     device_name = db.Column(db.String(255))
     __table_args__ = (db.UniqueConstraint('user_id', 'txid', name='user_txid_uc'),)
 
-    def __init__(self, user, date, wallet_address, amount, txid, direction, attachment):
+    def __init__(self, user, date, wallet_address, amount, amount_nzd, txid, direction, attachment):
         self.date = date
         self.user = user
         self.wallet_address = wallet_address
         self.amount = amount
+        self.amount_nzd = amount_nzd
         self.txid = txid
         self.direction = direction
         self.attachment = attachment
@@ -296,6 +299,12 @@ class MerchantTx(db.Model):
     @classmethod
     def update_wallet_address(cls, session, user):
         if user.wallet_address:
+            # select the merchant_rate to use
+            if user.merchant_rate:
+                rate = user.merchant_rate
+            else:
+                rate = app.config["MERCHANT_RATE"]
+            print(':: Merchant Rate is %s ::' % rate) 
             # update txs
             limit = 100
             oldest_txid = None
@@ -309,8 +318,10 @@ class MerchantTx(db.Model):
                     if have_tx:
                         break
                     if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
+                        #amount_nzd = round(((tx['amount']/100) * float( 1 - rate)),2)
+                        amount_nzd = (tx['amount'] / float(1 + rate))
                         date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
-                        session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], tx['id'], tx['direction'], tx['attachment']))
+                        session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], amount_nzd, tx['id'], tx['direction'], tx['attachment']))
                 if have_tx or len(txs) < limit:
                     break
             session.commit()
@@ -462,6 +473,8 @@ def _format_amount(view, context, model, name):
         return Markup(model.amount / 100)
     if name == 'amount_receive':
         return Markup(model.amount_receive / 100)
+    if name == 'amount_nzd':
+        return Markup(model.amount_nzd / 100)
 
 def get_device_names():
     if has_app_context():
@@ -671,7 +684,9 @@ class MerchantTxModelView(BaseOnlyUserOwnedModelView):
     can_export = True
     column_default_sort = ('date', True)
     column_exclude_list = ['user', 'wallet_address']
-    column_formatters = {'amount':_format_amount, 'direction':_format_direction}
+    column_formatters = {'amount':_format_amount, 'direction':_format_direction, 'amount_nzd':_format_amount}
+    column_list = ['date', 'amount', 'amount_nzd', 'txid', 'direction', 'category', 'attachment', 'device_name']
+    column_labels = dict(amount_nzd='Amount (NZD)')
     column_filters = [ DateBetweenFilter(MerchantTx.date, 'Search Date'), DateTimeGreaterFilter(MerchantTx.date, 'Search Date'), DateSmallerFilter(MerchantTx.date, 'Search Date'), FilterGreater(MerchantTx.amount, 'Search Amount'), FilterSmaller(MerchantTx.amount, 'Search Amount'), FilterByDeviceName(MerchantTx.device_name, 'Search Device Name'), FilterByCategory(MerchantTx.category, 'Search Category') ]
     list_template = 'merchanttx_list.html'
 
