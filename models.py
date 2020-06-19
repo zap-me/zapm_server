@@ -23,7 +23,7 @@ import qrcode
 import qrcode.image.svg
 
 from app_core import app, db, aw
-from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions
+from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions, apply_merchant_rate
 
 logger = logging.getLogger(__name__)
 
@@ -300,10 +300,7 @@ class MerchantTx(db.Model):
     def update_wallet_address(cls, session, user):
         if user.wallet_address:
             # select the merchant_rate to use
-            if user.merchant_rate:
-                rate = user.merchant_rate
-            else:
-                rate = app.config["MERCHANT_RATE"]
+            rate = user.merchant_rate if user.merchant_rate else app.config["MERCHANT_RATE"]
             print(':: Merchant Rate is %s ::' % rate) 
             # update txs
             limit = 100
@@ -318,8 +315,7 @@ class MerchantTx(db.Model):
                     if have_tx:
                         break
                     if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
-                        #amount_nzd = round(((tx['amount']/100) * float( 1 - rate)),2)
-                        amount_nzd = (tx['amount'] / float(1 + rate))
+                        amount_nzd = apply_merchant_rate(tx['amount'], rate)
                         date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
                         session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], amount_nzd, tx['id'], tx['direction'], tx['attachment']))
                 if have_tx or len(txs) < limit:
@@ -474,7 +470,7 @@ def _format_amount(view, context, model, name):
     if name == 'amount_receive':
         return Markup(model.amount_receive / 100)
     if name == 'amount_nzd':
-        return Markup(model.amount_nzd / 100)
+        return round((model.amount_nzd / 100),2)
 
 def get_device_names():
     if has_app_context():
