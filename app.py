@@ -216,7 +216,7 @@ class SocketIoNamespace(Namespace):
         print(e)
 
     def on_connect(self):
-        print("connect %s" % request.sid)
+        print("connect sid: %s" % request.sid)
 
     def on_auth(self, auth):
         # check auth
@@ -224,6 +224,7 @@ class SocketIoNamespace(Namespace):
         if res:
             emit("info", "authenticated!")
             # join room and store user
+            print("join room for api_key: %s" % auth["api_key"])
             join_room(auth["api_key"])
             ws_api_keys[auth["api_key"]] = request.sid
             ws_sids[request.sid] = auth["api_key"]
@@ -233,7 +234,7 @@ class SocketIoNamespace(Namespace):
         if request.sid in ws_sids:
             api_key = ws_sids[request.sid]
             if api_key in ws_api_keys:
-                print("disconnect api key: %s" % api_key)
+                print("leave room for api key: %s" % api_key)
                 leave_room(api_key)
                 del ws_api_keys[api_key]
             del ws_sids[request.sid]
