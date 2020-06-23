@@ -14,7 +14,7 @@ from flask_security import current_user
 from app_core import app, db, socketio, aw
 from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
-from utils import check_hmac_auth, generate_key
+from utils import check_hmac_auth, generate_key, apply_merchant_rate
 import bnz_ib4b
 
 logger = logging.getLogger(__name__)
@@ -362,7 +362,7 @@ def settlement():
     if not bank or bank.user != api_key.user:
         return bad_request("invalid bank account")
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
-    amount_receive = amount / (1 + merchant_rate)
+    amount_receive = apply_merchant_rate(amount, merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1

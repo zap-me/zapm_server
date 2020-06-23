@@ -76,3 +76,7 @@ def blockchain_transactions(node, wallet_address, limit, after=None):
             tx['direction'] = False
         txs_result.append(tx)
     return txs_result
+
+def apply_merchant_rate(amount, rate):
+    amount_nzd = (amount / float(1 + rate))
+    return amount_nzd
