@@ -13,3 +13,4 @@ werkzeug==0.16.1
 base58==2.0.0
 python-stdnum==1.12
 qrcode==6.1
+email-validator==1.0.5
