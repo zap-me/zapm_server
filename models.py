@@ -4,6 +4,7 @@ import decimal
 import logging
 import io
 import json
+from urllib.parse import urlparse
 
 from flask import redirect, url_for, request, abort, flash, has_app_context, g
 from flask_admin import expose
@@ -728,7 +729,9 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     def _format_qrcode(view, context, model, name):
         admin = model.account_admin if model.account_admin else False
         address = model.user.wallet_address if model.user.wallet_address else ''
-        data = 'zapm_apikey:%s?secret=%s&name=%s&admin=%r&address=%s' % (model.token, model.secret, model.name, admin, address)
+        url = urlparse(request.base_url)
+        server = url.scheme+'://'+url.netloc.split(":")[0]
+        data = 'zapm_apikey:%s?secret=%s&name=%s&admin=%r&address=%s&server=%s' % (model.token, model.secret, model.name, admin, address, server)
         factory = qrcode.image.svg.SvgPathImage
         img = qrcode.make(data, image_factory=factory)
         output = io.BytesIO()
