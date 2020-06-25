@@ -309,7 +309,7 @@ class MerchantTx(db.Model):
             txs = []
             while True:
                 have_tx = False
-                txs = blockchain_transactions(app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
+                txs = blockchain_transactions(logger, app.config["NODE_ADDRESS"], user.wallet_address, limit, oldest_txid)
                 for tx in txs:
                     oldest_txid = tx["id"]
                     have_tx = MerchantTx.exists(db.session, user, oldest_txid)
