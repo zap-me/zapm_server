@@ -621,7 +621,13 @@ class SettlementAdminModelView(RestrictedModelView):
             logger.error("settlement (%s) tx attachment is empty" % settlement.token)
             return False
         attachment = base58.b58decode(tx["attachment"]).decode("utf-8")
-        if attachment != settlement.token:
+        found_token = attachment == settlement.token
+        if not found_token:
+            try:
+                found_token = json.loads(attachment)["msg"] == settlement.token
+            except:
+                pass
+        if not found_token:
             logger.error("settlement (%s) tx attachment (%s) is not correct" % (settlement.token, attachment))
             return False
         return True
