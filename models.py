@@ -10,6 +10,7 @@ from flask import redirect, url_for, request, abort, flash, has_app_context, g
 from flask_admin import expose
 from flask_admin.actions import action
 from flask_admin.babel import lazy_gettext
+from flask_admin.helpers import get_form_data
 from flask_admin.model import filters
 from flask_admin.contrib import sqla
 from sqlalchemy import and_
@@ -341,11 +342,12 @@ class SettlementSchema(Schema):
     status = fields.String()
 
 class Settlement(db.Model):
-    CREATED = "created"
-    SENT_ZAP = "sent_zap"
-    VALIDATED = "validated"
-    SENT_NZD = "sent_nzd"
-    ERROR = "error"
+    STATE_CREATED = "created"
+    STATE_SENT_ZAP = "sent_zap"
+    STATE_VALIDATED = "validated"
+    STATE_SENT_NZD = "sent_nzd"
+    STATE_ERROR = "error"
+    STATE_SUSPENDED = "suspended"
 
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.DateTime())
@@ -369,7 +371,7 @@ class Settlement(db.Model):
         self.settlement_address = settlement_address
         self.amount_receive = amount_receive
         self.txid = None
-        self.status = Settlement.CREATED
+        self.status = Settlement.STATE_CREATED
 
     @classmethod
     def count(cls, session):
@@ -392,11 +394,11 @@ class Settlement(db.Model):
 
     @classmethod
     def all_sent_zap(cls, session):
-        return session.query(cls).filter(cls.status == cls.SENT_ZAP).all()
+        return session.query(cls).filter(cls.status == cls.STATE_SENT_ZAP).all()
 
     @classmethod
     def all_validated(cls, session):
-        return session.query(cls).filter(cls.status == cls.VALIDATED).all()
+        return session.query(cls).filter(cls.status == cls.STATE_VALIDATED).all()
 
     @classmethod
     def from_id_list(cls, session, ids):
@@ -618,7 +620,33 @@ class SettlementAdminModelView(RestrictedModelView):
     column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterBySettlementStatus(Settlement.status, 'Search Status')]
     list_template = 'settlement_list.html'
 
-    column_formatters = dict(amount=_format_amount, amount_receive=_format_amount)
+    def _format_status_column(view, context, model, name):
+        if model.status in (model.STATE_CREATED, model.STATE_SENT_NZD):
+            return model.status
+        if current_user.has_role('admin') or current_user.has_role('finance'):
+            if model.status in (model.STATE_ERROR, model.STATE_SUSPENDED):
+                reset_url = url_for('.reset_view')
+                html = '''
+                    {status}
+                    <form action="{reset_url}" method="POST">
+                        <input id="settlement_id" name="settlement_id"  type="hidden" value="{settlement_id}">
+                        <button type='submit'>Reset</button>
+                    </form>
+                '''.format(status=model.status, reset_url=reset_url, settlement_id=model.id)
+                return Markup(html)
+            if model.status in (model.STATE_SENT_ZAP, model.STATE_VALIDATED):
+                suspend_url = url_for('.suspend_view')
+                html = '''
+                    {status}
+                    <form action="{suspend_url}" method="POST">
+                        <input id="settlement_id" name="settlement_id"  type="hidden" value="{settlement_id}">
+                        <button type='submit'>Suspend</button>
+                    </form>
+                '''.format(status=model.status, suspend_url=suspend_url, settlement_id=model.id)
+                return Markup(html)
+        return model.status
+
+    column_formatters = dict(amount=_format_amount, amount_receive=_format_amount, status=_format_status_column)
     column_labels = dict(amount='ZAP Amount', amount_receive='NZD Amount')
 
     def settlement_validated(self, settlement):
@@ -653,6 +681,68 @@ class SettlementAdminModelView(RestrictedModelView):
             return False
         return True
 
+    @expose('reset', methods=['POST'])
+    def reset_view(self):
+        return_url = self.get_url('.index_view')
+        # check permission
+        if not (current_user.has_role('admin') or current_user.has_role('finance')):
+            # permission denied
+            flash('Not authorized.', 'error')
+            return redirect(return_url)
+        # get the model from the database
+        form = get_form_data()
+        if not form:
+            flash('Could not get form data.', 'error')
+            return redirect(return_url)
+        settlement_id = form['settlement_id']
+        settlement = self.get_one(settlement_id)
+        if settlement is None:
+            flash('Settlement not not found.', 'error')
+            return redirect(return_url)
+        # process the settlement
+        if settlement.status in (settlement.STATE_ERROR, settlement.STATE_SUSPENDED):
+            settlement.status = settlement.STATE_SENT_ZAP
+        # commit to db
+        try:
+            self.session.commit()
+            flash('Settlement {settlement_id} set as sent_zap'.format(settlement_id=settlement_id))
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash('Failed to set Settlement {settlement_id} as sent_zap'.format(settlement_id=settlement_id), 'error')
+        return redirect(return_url)
+
+    @expose('suspend', methods=['POST'])
+    def suspend_view(self):
+        return_url = self.get_url('.index_view')
+        # check permission
+        if not (current_user.has_role('admin') or current_user.has_role('finance')):
+            # permission denied
+            flash('Not authorized.', 'error')
+            return redirect(return_url)
+        # get the model from the database
+        form = get_form_data()
+        if not form:
+            flash('Could not get form data.', 'error')
+            return redirect(return_url)
+        settlement_id = form['settlement_id']
+        settlement = self.get_one(settlement_id)
+        if settlement is None:
+            flash('Settlement not not found.', 'error')
+            return redirect(return_url)
+        # process the settlement
+        if settlement.status in (settlement.STATE_SENT_ZAP, settlement.STATE_VALIDATED):
+            settlement.status = settlement.STATE_SUSPENDED
+        # commit to db
+        try:
+            self.session.commit()
+            flash('Settlement {settlement_id} set as suspended'.format(settlement_id=settlement_id))
+        except Exception as ex:
+            if not self.handle_view_exception(ex):
+                raise
+            flash('Failed to set Settlement {settlement_id} as suspended'.format(settlement_id=settlement_id), 'error')
+        return redirect(return_url)
+
     @expose("/validate")
     def validate(self):
         count = 0
@@ -662,9 +752,9 @@ class SettlementAdminModelView(RestrictedModelView):
             if res == None:
                 continue
             if res:
-                settlement.status = Settlement.VALIDATED
+                settlement.status = Settlement.STATE_VALIDATED
             else:
-                settlement.status = Settlement.ERROR
+                settlement.status = Settlement.STATE_ERROR
             count += 1
             db.session.add(settlement)
         db.session.commit()
@@ -683,7 +773,7 @@ class SettlementAdminModelView(RestrictedModelView):
         count = len(settlements)
         if process and ids and request.method == 'POST':
             for settlement in settlements:
-                settlement.status = Settlement.SENT_NZD
+                settlement.status = Settlement.STATE_SENT_NZD
                 db.session.add(settlement)
             db.session.commit()
             flash('Settlements processed')
