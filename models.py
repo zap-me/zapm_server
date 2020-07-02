@@ -489,6 +489,14 @@ def get_categories():
         for category in g.categories:
             yield category, category
 
+def get_settlement_statuses():
+    if has_app_context():
+        if not hasattr(g, 'settlement_statuses'):
+            query = db.session.query(Settlement.status.distinct().label('status'))
+            g.settlement_statuses = [row.status for row in query.all()]
+        for status in g.settlement_statuses:
+            yield status, status
+
 def _format_direction(view, context, model, name):
     if model.direction == 0:
         return Markup('out')
@@ -525,6 +533,18 @@ class FilterByCategory(BaseSQLAFilter):
         # This will return a generator which is reloaded every time it is used.
         # Without this we need to restart the server to update the cache of device names.
         return ReloadingIterator(get_categories)
+
+class FilterBySettlementStatus(BaseSQLAFilter):
+    def apply(self, query, value):
+        return query.filter(Settlement.status == value)
+
+    def operation(self):
+        return u'equals'
+
+    def get_options(self, view):
+        # This will return a generator which is reloaded every time it is used.
+        # Without this we need to restart the server to update the cache of device names.
+        return ReloadingIterator(get_settlement_statuses)
 
 class BaseModelView(sqla.ModelView):
     def _handle_view(self, name, **kwargs):
@@ -595,7 +615,7 @@ class SettlementAdminModelView(RestrictedModelView):
     can_delete = False
     can_edit = False
     can_export = True
-    column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterEqual(Settlement.status, 'Search Status'), FilterNotEqual(Settlement.status, 'Search Status')]
+    column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterBySettlementStatus(Settlement.status, 'Search Status')]
     list_template = 'settlement_list.html'
 
     column_formatters = dict(amount=_format_amount, amount_receive=_format_amount)
