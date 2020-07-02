@@ -606,6 +606,7 @@ class SettlementAdminModelView(RestrictedModelView):
             return None
         tx = aw.transfer_tx(settlement.txid)
         if not tx:
+            logger.error("settlement (%s) tx %s not found" % (settlement.token, settlement.txid))
             return None
         if tx["recipient"] != settlement.settlement_address:
             logger.error("settlement (%s) tx recipient is not correct" % (settlement.token, tx["recipient"]))
