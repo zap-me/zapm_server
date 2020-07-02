@@ -364,6 +364,9 @@ def settlement():
     if not bank or bank.user != api_key.user:
         return bad_request("invalid bank account")
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
+    merchant_name = api_key.user.merchant_name 
+    if not merchant_name: 
+        return bad_request("merchant name not set")
     amount_receive = apply_merchant_rate(amount, merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
