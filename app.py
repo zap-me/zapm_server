@@ -158,6 +158,8 @@ def before_request_func():
         print(request.headers)
 
     if not current_user.is_anonymous:
+        if current_user.has_role("admin") or current_user.has_role("finance"):
+            current_user.settlement_wallet_balance = get_update_balance(app.config["SETTLEMENT_ADDRESS"])
         if current_user.wallet_address:
             current_user.wallet_balance = get_update_balance(current_user.wallet_address)
 
