@@ -578,10 +578,20 @@ class RestrictedModelView(BaseModelView):
     can_edit = False
     column_exclude_list = ['password', 'secret']
 
+    extra_roles = []
+
+    def check_roles(self):
+        if current_user.has_role('admin'):
+            return True
+        for role in self.extra_roles:
+            if current_user.has_role(role):
+                return True
+        return False
+
     def is_accessible(self):
         return (current_user.is_active and
                 current_user.is_authenticated and
-                current_user.has_role('admin'))
+                self.check_roles())
 
 class UserModelView(RestrictedModelView):
     can_create = False
@@ -619,6 +629,8 @@ class SettlementAdminModelView(RestrictedModelView):
     can_export = True
     column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterBySettlementStatus(Settlement.status, 'Search Status')]
     list_template = 'settlement_list.html'
+
+    extra_roles = ['finance']
 
     def _format_status_column(view, context, model, name):
         if model.status in (model.STATE_CREATED, model.STATE_SENT_NZD):
