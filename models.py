@@ -854,6 +854,7 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     can_edit = False
     column_list = ('date', 'name', 'token', 'secret', 'QRCode', 'account_admin')
     form_excluded_columns = ['user', 'date', 'token', 'nonce', 'secret']
+    column_labels = dict(token='API Key', secret='API Secret')
 
     def _format_qrcode(view, context, model, name):
         admin = model.account_admin if model.account_admin else False
