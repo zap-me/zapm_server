@@ -397,7 +397,7 @@ def settlement_set_txid():
     if settlement.txid:
         return bad_request("Transaction ID already set")
     settlement.txid = txid
-    settlement.status = Settlement.SENT_ZAP
+    settlement.status = Settlement.STATE_SENT_ZAP
     db.session.add(settlement)
     db.session.commit()
     return jsonify(settlement.to_json())
