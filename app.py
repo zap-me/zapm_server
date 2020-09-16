@@ -158,6 +158,8 @@ def before_request_func():
         print(request.headers)
 
     if not current_user.is_anonymous:
+        if current_user.has_role("admin") or current_user.has_role("finance"):
+            current_user.settlement_wallet_balance = get_update_balance(app.config["SETTLEMENT_ADDRESS"])
         if current_user.wallet_address:
             current_user.wallet_balance = get_update_balance(current_user.wallet_address)
 
@@ -362,6 +364,9 @@ def settlement():
     if not bank or bank.user != api_key.user:
         return bad_request("invalid bank account")
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
+    merchant_name = api_key.user.merchant_name 
+    if not merchant_name: 
+        return bad_request("merchant name not set")
     amount_receive = apply_merchant_rate(amount, merchant_rate)
     amount_receive = int(amount_receive)
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
@@ -392,7 +397,7 @@ def settlement_set_txid():
     if settlement.txid:
         return bad_request("Transaction ID already set")
     settlement.txid = txid
-    settlement.status = Settlement.SENT_ZAP
+    settlement.status = Settlement.STATE_SENT_ZAP
     db.session.add(settlement)
     db.session.commit()
     return jsonify(settlement.to_json())

@@ -8,7 +8,7 @@ from models import security, RestrictedModelView, UserModelView, BankAdminModelV
 # Create admin
 admin = flask_admin.Admin(
     app,
-    'Zap Merchant Server',
+    'Zap Retailer Server',
     base_template='my_master.html',
     template_mode='bootstrap3',
 )
@@ -20,10 +20,10 @@ admin.add_view(BankAdminModelView(Bank, db.session, category='Admin'))
 admin.add_view(SettlementAdminModelView(Settlement, db.session, category='Admin'))
 admin.add_view(ClaimCodeModelView(ClaimCode, db.session, category='Reports'))
 admin.add_view(TxNotificationModelView(TxNotification, db.session, category='Reports'))
-admin.add_view(MerchantTxModelView(MerchantTx, db.session, category='Merchant'))
-admin.add_view(ApiKeyModelView(ApiKey, db.session, category='Merchant'))
-admin.add_view(BankModelView(Bank, db.session, endpoint='BankUser', category='Merchant'))
-admin.add_view(SettlementModelView(Settlement, db.session, endpoint='SettlementUser', category='Merchant'))
+admin.add_view(MerchantTxModelView(MerchantTx, db.session, name='Retail Transactions' ,category='Retailer'))
+admin.add_view(ApiKeyModelView(ApiKey, db.session, category='Retailer'))
+admin.add_view(BankModelView(Bank, db.session, endpoint='BankUser', category='Retailer'))
+admin.add_view(SettlementModelView(Settlement, db.session, endpoint='SettlementUser', category='Retailer'))
 
 # define a context processor for merging flask-admin's template context into the
 # flask-security views.

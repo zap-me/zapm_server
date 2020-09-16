@@ -22,7 +22,7 @@
 <br/>
 <br/>
 <div class="container">
-    {% if current_user.has_role("admin") %}
+    {% if current_user.has_role("admin") or current_user.has_role("finance") %}
         <hr/>
         <small>
             General rates:
@@ -30,7 +30,7 @@
                 <li>merchant: <code>{{merchant_rate * 100}}%</code></li>
                 <li>customer: <code>{{customer_rate * 100}}%</code></li>
             </ul>
-            Settlement address: <code>{{settlement_address}}</code>
+            Settlement address: <code>{{settlement_address}}</code> balance: <code>{{current_user.settlement_wallet_balance}}</code>
         </small>
     {% endif %}
     {% if current_user.wallet_address %}

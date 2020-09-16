@@ -28,6 +28,7 @@ if os.getenv("PRODUCTION"):
     app.config["NODE_ADDRESS"] = "http://nodes.wavesnodes.com"
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
 if os.getenv("SESSION_KEY"):
     app.config["SECRET_KEY"] = os.getenv("SESSION_KEY")
 if os.getenv("PASSWORD_SALT"):

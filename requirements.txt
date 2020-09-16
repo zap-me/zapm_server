@@ -14,3 +14,4 @@ base58==2.0.0
 python-stdnum==1.12
 qrcode==6.1
 email-validator==1.0.5
+sendgrid==6.3.1
