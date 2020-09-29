@@ -627,7 +627,7 @@ class UserModelView(RestrictedModelView):
             model.generate_defaults()
             # Send email
             msg = Message('Thank you for signing up to retail.zap.me', recipients=[model.email])
-            msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["HTTPS_ADDRESS"])
+            msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["SITE_URL"])
             mail.send(msg)
 
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate', 'wallet_address']

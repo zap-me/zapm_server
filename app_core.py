@@ -49,8 +49,11 @@ if os.getenv("SENDER_BANK_ACCOUNT"):
     app.config["SENDER_BANK_ACCOUNT"] = os.getenv("SENDER_BANK_ACCOUNT")
 if os.getenv("SENDER_NAME"):
     app.config["SENDER_NAME"] = os.getenv("SENDER_NAME")
-if os.getenv("HTTPS_ADDRESS"):
-    app.config["HTTPS_ADDRESS"] = os.getenv("HTTPS_ADDRESS")
+if os.getenv("SITE_URL"):
+    app.config["SITE_URL"] = os.getenv("SITE_URL")
+if os.getenv("ALLOW_USER_REGISTRATION"):
+    app.config["SECURITY_REGISTERABLE"] = True
+    app.config["SECURITY_CONFIRMABLE"] = True
 db = SQLAlchemy(app)
 mail = MailSendGrid(app)
 socketio = SocketIO(app)
