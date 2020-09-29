@@ -74,7 +74,7 @@ class User(db.Model, UserMixin):
 
     def on_admin_created(self):
         self.merchant_code = generate_key(4)
-        self.password = encrypt(generate_random_password(16))
+        self.password = encrypt_password(generate_random_password(16))
         self.confirmed_at = datetime.datetime.now()
         self.active = True
 
