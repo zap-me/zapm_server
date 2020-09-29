@@ -72,9 +72,9 @@ class User(db.Model, UserMixin):
         self.merchant_code = generate_key(4)
         super().__init__(**kwargs)
 
-    def generate_defaults(self):
+    def on_admin_created(self):
         self.merchant_code = generate_key(4)
-        self.password = encrypt_password(generate_random_password(16))
+        self.password = encrypt(generate_random_password(16))
         self.confirmed_at = datetime.datetime.now()
         self.active = True
 
@@ -624,7 +624,7 @@ class UserModelView(RestrictedModelView):
 
     def on_model_change(self, form, model, is_created):
         if is_created:
-            model.generate_defaults()
+            model.on_admin_created()
             # Send email
             msg = Message('Thank you for signing up to retail.zap.me', recipients=[model.email])
             msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["SITE_URL"])

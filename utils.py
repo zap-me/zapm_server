@@ -6,7 +6,7 @@ import base64
 import io
 import re
 import string
-import random
+import secrets
 
 import requests
 import base58
@@ -90,5 +90,5 @@ def is_email(email):
 
 def generate_random_password(length):
     password_characters = string.ascii_letters + string.digits + string.punctuation
-    random_password = ''.join(random.choice(password_characters) for i in range(length))
-    return random_password
+    secret_password = ''.join(secrets.choice(password_characters) for i in range(length))
+    return secret_password
