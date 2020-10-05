@@ -603,20 +603,11 @@ class RestrictedModelView(BaseModelView):
                 self.check_roles())
 
 class UserModelView(RestrictedModelView):
-    can_create = False
     can_delete = False
     can_edit = False
 
-    ## can_create is true if user has admin role
     def can_create(self):
-        if current_user.has_role('admin'):
-            can_create = True
-        return False
-
-    def can_delete(self):
-        if current_user.has_role('admin'):
-            can_delete = True
-        return False
+        return current_user.has_role('admin')
 
     def validate_email_address(form, field):
         if not is_email(field.data):
