@@ -428,8 +428,10 @@ def claim():
 
 if __name__ == "__main__":
     setup_logging(logging.DEBUG)
+    logger.info("starting server..")
 
     # create tables
+    logger.info("creating tables..")
     db.create_all()
     create_role("admin", "super user")
     create_role("finance", "Can view/action settlements")
@@ -457,7 +459,7 @@ if __name__ == "__main__":
 
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
-        print("binding to port: %d" % port)
+        logger.info("binding to port: %d" % port)
         socketio.run(app, host="0.0.0.0", port=port)
         # stop addresswatcher
         if aw:
