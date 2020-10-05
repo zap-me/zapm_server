@@ -13,19 +13,22 @@ from flask_admin.babel import lazy_gettext
 from flask_admin.helpers import get_form_data
 from flask_admin.model import filters
 from flask_admin.contrib import sqla
+from flask_mail import Message
 from sqlalchemy import and_
 from flask_admin.contrib.sqla.filters import BaseSQLAFilter
 from wtforms import ValidationError
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
+from flask_security.utils import encrypt_password
 from marshmallow import Schema, fields
 from markupsafe import Markup
 import base58
 import qrcode
 import qrcode.image.svg
+from wtforms.validators import DataRequired, InputRequired
 
-from app_core import app, db, aw
-from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions, apply_merchant_rate
+from app_core import app, db, aw, mail
+from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions, apply_merchant_rate, is_email, generate_random_password
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +71,12 @@ class User(db.Model, UserMixin):
     def __init__(self, **kwargs):
         self.merchant_code = generate_key(4)
         super().__init__(**kwargs)
+
+    def on_admin_created(self):
+        self.merchant_code = generate_key(4)
+        self.password = encrypt_password(generate_random_password(16))
+        self.confirmed_at = datetime.datetime.now()
+        self.active = True
 
     @classmethod
     def from_email(cls, session, email):
@@ -597,8 +606,37 @@ class UserModelView(RestrictedModelView):
     can_create = False
     can_delete = False
     can_edit = False
+
+    ## can_create is true if user has admin role
+    def can_create(self):
+        if current_user.has_role('admin'):
+            can_create = True
+        return False
+
+    def can_delete(self):
+        if current_user.has_role('admin'):
+            can_delete = True
+        return False
+
+    def validate_email_address(form, field):
+        if not is_email(field.data):
+            raise ValidationError('invalid email address format')
+
+    def on_model_change(self, form, model, is_created):
+        if is_created:
+            model.on_admin_created()
+            # Send email
+            msg = Message('Thank you for signing up to retail.zap.me', recipients=[model.email])
+            msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["SITE_URL"])
+            mail.send(msg)
+
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate', 'wallet_address']
     column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    form_columns = ['roles', 'merchant_name', 'email']
+    form_args = dict(
+        email=dict(validators=[DataRequired(), validate_email_address]),
+        merchant_name=dict(validators=[DataRequired()])
+    )
 
 class BankAdminModelView(RestrictedModelView):
     can_create = False

@@ -4,6 +4,9 @@ import hmac
 import hashlib
 import base64
 import io
+import re
+import string
+import secrets
 
 import requests
 import base58
@@ -81,3 +84,11 @@ def blockchain_transactions(logger, node, wallet_address, limit, after=None):
 def apply_merchant_rate(amount, rate):
     amount_nzd = (amount / float(1 + rate))
     return amount_nzd
+
+def is_email(email):
+    return re.match("[^@]+@[^@]+\.[^@]+", email)
+
+def generate_random_password(length):
+    password_characters = string.ascii_letters + string.digits + string.punctuation
+    secret_password = ''.join(secrets.choice(password_characters) for i in range(length))
+    return secret_password
