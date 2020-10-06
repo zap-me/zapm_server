@@ -3,7 +3,7 @@ import flask_admin
 from flask_admin import helpers as admin_helpers
 
 from app_core import app, db
-from models import security, RestrictedModelView, UserModelView, BankAdminModelView, BankModelView, ApiKeyModelView, ClaimCodeModelView, TxNotificationModelView, MerchantTxModelView, SettlementAdminModelView, SettlementModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement, Bank
+from models import security, RestrictedModelView, AdminUserModelView, FinanceUserModelView, BankAdminModelView, BankModelView, ApiKeyModelView, ClaimCodeModelView, TxNotificationModelView, MerchantTxModelView, SettlementAdminModelView, SettlementModelView, Role, User, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement, Bank
 
 # Create admin
 admin = flask_admin.Admin(
@@ -15,8 +15,9 @@ admin = flask_admin.Admin(
 
 # Add model views
 admin.add_view(RestrictedModelView(Role, db.session, category='Admin'))
-admin.add_view(UserModelView(User, db.session, category='Admin'))
-admin.add_view(BankAdminModelView(Bank, db.session, category='Admin'))
+admin.add_view(AdminUserModelView(User, db.session, category='Admin', endpoint='user_admin'))
+admin.add_view(FinanceUserModelView(User, db.session, category='Admin', endpoint='user_finance'))
+admin.add_view(BankAdminModelView(Bank, db.session, category='Admin' ))
 admin.add_view(SettlementAdminModelView(Settlement, db.session, category='Admin'))
 admin.add_view(ClaimCodeModelView(ClaimCode, db.session, category='Reports'))
 admin.add_view(TxNotificationModelView(TxNotification, db.session, category='Reports'))

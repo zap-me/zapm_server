@@ -25,7 +25,7 @@ from markupsafe import Markup
 import base58
 import qrcode
 import qrcode.image.svg
-from wtforms.validators import DataRequired, InputRequired
+from wtforms.validators import DataRequired
 
 from app_core import app, db, aw, mail
 from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions, apply_merchant_rate, is_email, generate_random_password
@@ -603,11 +603,9 @@ class RestrictedModelView(BaseModelView):
                 self.check_roles())
 
 class UserModelView(RestrictedModelView):
+    can_create = False
     can_delete = False
     can_edit = False
-
-    def can_create(self):
-        return current_user.has_role('admin')
 
     def validate_email_address(form, field):
         if not is_email(field.data):
@@ -622,12 +620,26 @@ class UserModelView(RestrictedModelView):
             mail.send(msg)
 
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate', 'wallet_address']
-    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
-    form_columns = ['roles', 'merchant_name', 'email']
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
     )
+
+class AdminUserModelView(UserModelView):
+    can_create = True
+    def is_accessible(self):
+        return (current_user.has_role('admin'))
+
+    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    form_columns = ['roles', 'merchant_name', 'email']
+
+class FinanceUserModelView(UserModelView):
+    can_create = True
+    def is_accessible(self):
+        return (current_user.has_role('finance'))
+
+    column_editable_list = ['merchant_name', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    form_columns = ['merchant_name', 'email']
 
 class BankAdminModelView(RestrictedModelView):
     can_create = False
