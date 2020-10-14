@@ -149,7 +149,7 @@ def bad_request(message):
 
 @app.context_processor
 def inject_rates():
-    return dict(merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"], settlement_address=app.config["SETTLEMENT_ADDRESS"])
+    return dict(settlement_fee=app.config["SETTLEMENT_FEE"], merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"], settlement_address=app.config["SETTLEMENT_ADDRESS"])
 
 @app.before_request
 def before_request_func():
@@ -331,9 +331,10 @@ def rates():
     res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
     if not res:
         return bad_request(reason)
+    settlement_fee = api_key.user.settlement_fee if api_key.user.settlement_fee else app.config["SETTLEMENT_FEE"]
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
     customer_rate = api_key.user.customer_rate if api_key.user.customer_rate else app.config["CUSTOMER_RATE"]
-    rates = {"merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
+    rates = {"settlement_fee": str(settlement_fee), "merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
     return jsonify(rates)
 
 @app.route("/banks", methods=["POST"])
@@ -349,6 +350,25 @@ def banks():
     banks = [bank.to_json() for bank in banks]
     return jsonify(banks)
 
+def _settlement_calc(api_key, amount):
+    settlement_fee = api_key.user.settlement_fee if api_key.user.settlement_fee else app.config["SETTLEMENT_FEE"]
+    merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
+    amount_receive = apply_merchant_rate(amount, merchant_rate, int(settlement_fee * 100))
+    return int(amount_receive)
+
+@app.route("/settlement_calc", methods=["POST"])
+def settlement_calc():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    amount = content["amount"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return bad_request(reason)
+    amount_receive = _settlement_calc(api_key, amount)
+    return jsonify({"amount": amount, "amount_receive": amount_receive})
+
 @app.route("/settlement", methods=["POST"])
 def settlement():
     sig = request.headers.get("X-Signature")
@@ -363,12 +383,9 @@ def settlement():
     bank = Bank.from_token(db.session, bank)
     if not bank or bank.user != api_key.user:
         return bad_request("invalid bank account")
-    merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
-    merchant_name = api_key.user.merchant_name 
-    if not merchant_name: 
-        return bad_request("merchant name not set")
-    amount_receive = apply_merchant_rate(amount, merchant_rate)
-    amount_receive = int(amount_receive)
+    amount_receive = _settlement_calc(api_key, amount)
+    if amount_receive <= 0:
+        return bad_request("Settlement amount less then or equal to 0");
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
     if count_this_month >= max_this_month:

@@ -64,6 +64,7 @@ class User(db.Model, UserMixin):
     roles = db.relationship('Role', secondary=roles_users,
                             backref=db.backref('users', lazy='dynamic'))
     max_settlements_per_month = db.Column(db.Integer)
+    settlement_fee = db.Column(db.Numeric)
     merchant_rate = db.Column(db.Numeric)
     customer_rate = db.Column(db.Numeric)
     wallet_address = db.Column(db.String(255))
@@ -326,7 +327,7 @@ class MerchantTx(db.Model):
                     if have_tx:
                         break
                     if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
-                        amount_nzd = apply_merchant_rate(tx['amount'], rate)
+                        amount_nzd = apply_merchant_rate(tx['amount'], rate, 0)
                         date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
                         session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], amount_nzd, tx['id'], tx['direction'], tx['attachment']))
                 if have_tx or len(txs) < limit:
@@ -619,7 +620,7 @@ class UserModelView(RestrictedModelView):
             msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["SITE_URL"])
             mail.send(msg)
 
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate', 'wallet_address']
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
@@ -630,7 +631,7 @@ class AdminUserModelView(UserModelView):
     def is_accessible(self):
         return (current_user.has_role('admin'))
 
-    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate']
     form_columns = ['roles', 'merchant_name', 'email']
 
 class FinanceUserModelView(UserModelView):
@@ -638,7 +639,7 @@ class FinanceUserModelView(UserModelView):
     def is_accessible(self):
         return (current_user.has_role('finance'))
 
-    column_editable_list = ['merchant_name', 'max_settlements_per_month', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['merchant_name', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate']
     form_columns = ['merchant_name', 'email']
 
 class BankAdminModelView(RestrictedModelView):

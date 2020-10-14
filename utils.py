@@ -81,8 +81,8 @@ def blockchain_transactions(logger, node, wallet_address, limit, after=None):
         txs_result.append(tx)
     return txs_result
 
-def apply_merchant_rate(amount, rate):
-    amount_nzd = (amount / float(1 + rate))
+def apply_merchant_rate(amount, rate, fixed_fee):
+    amount_nzd = (amount / float(1 + rate)) - fixed_fee
     return amount_nzd
 
 def is_email(email):

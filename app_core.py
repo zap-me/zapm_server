@@ -35,14 +35,18 @@ if os.getenv("PASSWORD_SALT"):
     app.config["SECURITY_PASSWORD_SALT"] = os.getenv("PASSWORD_SALT")
 if os.getenv("SENDGRID_API_KEY"):
     app.config["MAIL_SENDGRID_API_KEY"] = os.getenv("SENDGRID_API_KEY")
+if os.getenv("SETTLEMENT_FEE"):
+    app.config["SETTLEMENT_FEE"] = decimal.Decimal(os.getenv("SETTLEMENT_FEE"))
+else:
+    app.config["SETTLEMENT_FEE"] = decimal.Decimal("3")
 if os.getenv("CUSTOMER_RATE"):
     app.config["CUSTOMER_RATE"] = decimal.Decimal(os.getenv("CUSTOMER_RATE"))
 else:
-    app.config["CUSTOMER_RATE"] = decimal.Decimal("0.05")
+    app.config["CUSTOMER_RATE"] = decimal.Decimal("0.08")
 if os.getenv("MERCHANT_RATE"):
     app.config["MERCHANT_RATE"] = decimal.Decimal(os.getenv("MERCHANT_RATE"))
 else:
-    app.config["MERCHANT_RATE"] = decimal.Decimal("0.05")
+    app.config["MERCHANT_RATE"] = decimal.Decimal("0.08")
 if os.getenv("SETTLEMENT_ADDRESS"):
     app.config["SETTLEMENT_ADDRESS"] = os.getenv("SETTLEMENT_ADDRESS")
 if os.getenv("SENDER_BANK_ACCOUNT"):
