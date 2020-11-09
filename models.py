@@ -20,6 +20,7 @@ from wtforms import ValidationError
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required, current_user
 from flask_security.utils import encrypt_password
+from flask_security.recoverable import send_reset_password_instructions
 from marshmallow import Schema, fields
 from markupsafe import Markup
 import base58
@@ -422,7 +423,7 @@ class Settlement(db.Model):
         return schema.dump(self).data
 
 #
-# Setup Flask-Security
+# Setup Flask-Security-Too
 #
 
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
@@ -615,10 +616,10 @@ class UserModelView(RestrictedModelView):
     def on_model_change(self, form, model, is_created):
         if is_created:
             model.on_admin_created()
-            # Send email
-            msg = Message('Thank you for signing up to retail.zap.me', recipients=[model.email])
-            msg.html = 'Thank you {}. <br/><br/><p>Please click <a href="{}/admin/reset">reset</a> and enter the registered email to reset your password.</p>'.format(model.merchant_name, app.config["SITE_URL"])
-            mail.send(msg)
+
+    def after_model_change(self, form, model, is_created):
+        if is_created:
+            send_reset_password_instructions(model)
 
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
     form_args = dict(
