@@ -35,6 +35,10 @@ if os.getenv("PASSWORD_SALT"):
     app.config["SECURITY_PASSWORD_SALT"] = os.getenv("PASSWORD_SALT")
 if os.getenv("SENDGRID_API_KEY"):
     app.config["MAIL_SENDGRID_API_KEY"] = os.getenv("SENDGRID_API_KEY")
+if os.getenv("SALES_TAX"):
+    app.config["SALES_TAX"] = decimal.Decimal(os.getenv("SALES_TAX"))
+else:
+    app.config["SALES_TAX"] = decimal.Decimal("0.15")
 if os.getenv("SETTLEMENT_FEE"):
     app.config["SETTLEMENT_FEE"] = decimal.Decimal(os.getenv("SETTLEMENT_FEE"))
 else:

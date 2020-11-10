@@ -149,7 +149,7 @@ def bad_request(message):
 
 @app.context_processor
 def inject_rates():
-    return dict(settlement_fee=app.config["SETTLEMENT_FEE"], merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"], settlement_address=app.config["SETTLEMENT_ADDRESS"])
+    return dict(sales_tax=app.config["SALES_TAX"], settlement_fee=app.config["SETTLEMENT_FEE"], merchant_rate=app.config["MERCHANT_RATE"], customer_rate=app.config["CUSTOMER_RATE"], settlement_address=app.config["SETTLEMENT_ADDRESS"])
 
 @app.before_request
 def before_request_func():
@@ -334,7 +334,7 @@ def rates():
     settlement_fee = api_key.user.settlement_fee if api_key.user.settlement_fee else app.config["SETTLEMENT_FEE"]
     merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
     customer_rate = api_key.user.customer_rate if api_key.user.customer_rate else app.config["CUSTOMER_RATE"]
-    rates = {"settlement_fee": str(settlement_fee), "merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"]}
+    rates = {"settlement_fee": str(settlement_fee), "merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"], "sales_tax": str(app.config["SALES_TAX"])}
     return jsonify(rates)
 
 @app.route("/banks", methods=["POST"])
@@ -351,9 +351,7 @@ def banks():
     return jsonify(banks)
 
 def _settlement_calc(api_key, amount):
-    settlement_fee = api_key.user.settlement_fee if api_key.user.settlement_fee else app.config["SETTLEMENT_FEE"]
-    merchant_rate = api_key.user.merchant_rate if api_key.user.merchant_rate else app.config["MERCHANT_RATE"]
-    amount_receive = apply_merchant_rate(amount, merchant_rate, int(settlement_fee * 100))
+    amount_receive = apply_merchant_rate(amount, api_key.user, app.config)
     return int(amount_receive)
 
 @app.route("/settlement_calc", methods=["POST"])

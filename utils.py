@@ -81,8 +81,36 @@ def blockchain_transactions(logger, node, wallet_address, limit, after=None):
         txs_result.append(tx)
     return txs_result
 
-def apply_merchant_rate(amount, rate, fixed_fee):
-    amount_nzd = (amount / float(1 + rate)) - fixed_fee
+def apply_merchant_rate(amount, user, config, use_fixed_fee=True):
+    print('amount: ' + str(amount))
+    sales_tax = config["SALES_TAX"]
+    print('sales_tax: ' + str(sales_tax))
+    settlement_fee = user.settlement_fee if user.settlement_fee != None else config["SETTLEMENT_FEE"]
+    print('settlement_fee: ' + str(settlement_fee))
+    merchant_rate = user.merchant_rate if user.merchant_rate != None else config["MERCHANT_RATE"]
+    print('merchant_rate: ' + str(merchant_rate))
+    if use_fixed_fee:
+        fixed_fee = int(settlement_fee * 100)
+    else:
+        fixed_fee = 0
+    print('fixed_fee: ' + str(fixed_fee))
+    fixed_fee = fixed_fee * (1 + sales_tax)
+    print('fixed_fee (inc tax): ' + str(fixed_fee))
+
+    #          r
+    # a = ----------
+    #     ms - s + 1
+    #
+    # where:
+    #  a = amount nzd
+    #  r = amount zap to settle
+    #  m = merchant rate
+    #  s = sales tax
+    amount_nzd = amount / ((1 + merchant_rate) * (1 + sales_tax) - (1 + sales_tax) + 1)
+
+    # fixed fee
+    amount_nzd = amount_nzd - fixed_fee
+
     return amount_nzd
 
 def is_email(email):

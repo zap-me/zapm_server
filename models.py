@@ -312,9 +312,6 @@ class MerchantTx(db.Model):
     @classmethod
     def update_wallet_address(cls, session, user):
         if user.wallet_address:
-            # select the merchant_rate to use
-            rate = user.merchant_rate if user.merchant_rate else app.config["MERCHANT_RATE"]
-            print(':: Merchant Rate is %s ::' % rate) 
             # update txs
             limit = 100
             oldest_txid = None
@@ -328,7 +325,7 @@ class MerchantTx(db.Model):
                     if have_tx:
                         break
                     if tx["type"] == 4 and tx["assetId"] == app.config["ASSET_ID"]:
-                        amount_nzd = apply_merchant_rate(tx['amount'], rate, 0)
+                        amount_nzd = apply_merchant_rate(tx['amount'], user, app.config, use_fixed_fee=False)
                         date = datetime.datetime.fromtimestamp(tx['timestamp'] / 1000)
                         session.add(MerchantTx(user, date, user.wallet_address, tx['amount'], amount_nzd, tx['id'], tx['direction'], tx['attachment']))
                 if have_tx or len(txs) < limit:
