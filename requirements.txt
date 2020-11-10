@@ -4,6 +4,7 @@ Flask-Security-Too==3.4.4
 Flask-SQLAlchemy==2.4.1
 Flask-Mail-SendGrid==0.3
 Flask-SocketIO==4.2.1
+Flask-Cors==1.10.3
 marshmallow==2.15.3
 psycopg2-binary==2.8.1
 requests==2.20.0

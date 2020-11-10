@@ -5,6 +5,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_mail_sendgrid import MailSendGrid
 from flask_socketio import SocketIO
+from flask_cors import CORS
 
 from addresswatcher import AddressWatcher
 
@@ -21,11 +22,11 @@ else:
     app.config["SQLALCHEMY_ECHO"] = False
 app.config["TESTNET"] = True
 app.config["ASSET_ID"] = "CgUrFtinLXEbJwJVjwwcppk4Vpz1nMmR3H5cQaDcUcfe"
-app.config["NODE_ADDRESS"] = "http://testnodes.wavesnodes.com"
+app.config["NODE_ADDRESS"] = "https://testnet1.wavesnodes.com"
 if os.getenv("PRODUCTION"):
     app.config["TESTNET"] = False
     app.config["ASSET_ID"] = "9R3iLi4qGLVWKc16Tg98gmRvgg1usGEYd7SgC1W5D6HB"
-    app.config["NODE_ADDRESS"] = "http://nodes.wavesnodes.com"
+    app.config["NODE_ADDRESS"] = "https://nodes.wavesnodes.com"
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
@@ -65,5 +66,6 @@ if os.getenv("ALLOW_USER_REGISTRATION"):
 db = SQLAlchemy(app)
 mail = MailSendGrid(app)
 socketio = SocketIO(app)
+cors = CORS(app, origins=['https://nodes.wavesnodes.com', 'https://testnet1.wavesnodes.com'])
 
 aw = AddressWatcher(app.config["TESTNET"])

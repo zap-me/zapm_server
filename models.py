@@ -618,7 +618,32 @@ class UserModelView(RestrictedModelView):
         if is_created:
             send_reset_password_instructions(model)
 
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
+    def _format_address_column(view, context, model, name):
+        if not model.wallet_address:
+            return ''
+        node_url = app.config["NODE_ADDRESS"]
+        asset_id = app.config["ASSET_ID"]
+        html = '''
+            {address}
+            <span id="{address}-balance"></span>
+            <script>
+                var xhr = new XMLHttpRequest();
+                var url = "{node_url}/assets/balance/{address}/{asset_id}";
+                xhr.onreadystatechange = function() {{
+                    if (this.readyState == 4 && this.status == 200) {{
+                        var json = JSON.parse(this.responseText);
+                        var bal = (json.balance / 100).toFixed(2);
+                        document.getElementById("{address}-balance").textContent = bal + ' ZAP';
+                    }}
+                }};
+                xhr.open("GET", url, true);
+                xhr.send();
+            </script>
+        '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id)
+        return Markup(html)
+
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
+    column_formatters = dict(wallet_address=_format_address_column)
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
