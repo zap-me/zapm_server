@@ -81,6 +81,8 @@ def check_auth(api_key_token, nonce, sig, body):
     api_key = ApiKey.from_token(db.session, api_key_token)
     if not api_key:
         return False, "not found", None
+    if not api_key.user.active:
+        return False, "inactive account", None
     res, reason = check_hmac_auth(api_key, nonce, sig, body)
     if not res:
         return False, reason, None

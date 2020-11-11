@@ -669,7 +669,7 @@ class UserModelView(RestrictedModelView):
         '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id)
         return Markup(html)
 
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'active']
     column_formatters = dict(wallet_address=_format_address_column)
     column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email') ]
     form_args = dict(
@@ -682,7 +682,7 @@ class AdminUserModelView(UserModelView):
     def is_accessible(self):
         return (current_user.has_role('admin'))
 
-    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'active']
     form_columns = ['roles', 'merchant_name', 'email']
 
 class FinanceUserModelView(UserModelView):
@@ -690,7 +690,7 @@ class FinanceUserModelView(UserModelView):
     def is_accessible(self):
         return (current_user.has_role('finance'))
 
-    column_editable_list = ['merchant_name', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate']
+    column_editable_list = ['merchant_name', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'active']
     form_columns = ['merchant_name', 'email']
 
 class BankAdminModelView(RestrictedModelView):
