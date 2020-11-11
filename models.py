@@ -441,6 +441,25 @@ class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
         start, end = value
         return query.filter(self.get_column(alias).between(start, end))
 
+class FilterStartsWithInsensitive(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias).ilike(value + '%'))
+
+    def operation(self):
+        return lazy_gettext('starts with')
+
+class FilterUserMerchantName(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.join(Settlement.user).filter(User.merchant_code == value)
+ 
+    def operation(self):
+        return lazy_gettext('equals')
+
+    def get_options(self, view):
+        # This will return a generator which is reloaded every time it is used.
+        # Without this we need to restart the server to update the cache of device names.
+        return ReloadingIterator(get_merchant_names)
+
 class FilterEqual(BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(self.get_column(alias) == value)
@@ -482,6 +501,14 @@ def _format_amount(view, context, model, name):
         return Markup(model.amount_receive / 100)
     if name == 'amount_nzd':
         return round((model.amount_nzd / 100),2)
+
+def get_merchant_names():
+    if has_app_context():
+        if not hasattr(g, 'merchant_names'):
+            query = db.session.query(User)
+            g.merchant_names = [(row.merchant_code, row.merchant_name) for row in query.all()]
+        for merchant_code, merchant_name in g.merchant_names:
+            yield merchant_code, '{0} - {1}'.format(merchant_name, merchant_code)
 
 def get_device_names():
     if has_app_context():
@@ -644,6 +671,7 @@ class UserModelView(RestrictedModelView):
 
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address']
     column_formatters = dict(wallet_address=_format_address_column)
+    column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email') ]
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
@@ -692,7 +720,7 @@ class SettlementAdminModelView(RestrictedModelView):
     can_delete = False
     can_edit = False
     can_export = True
-    column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterBySettlementStatus(Settlement.status, 'Search Status')]
+    column_filters = [DateBetweenFilter(Settlement.date, 'Search Date'), DateTimeGreaterFilter(Settlement.date, 'Search Date'), DateSmallerFilter(Settlement.date, 'Search Date'), FilterGreater(Settlement.amount, 'Search Amount'), FilterSmaller(Settlement.amount, 'Search Amount'), FilterBySettlementStatus(Settlement.status, 'Search Status'), FilterUserMerchantName(None, 'Search Merchant Name')]
     list_template = 'settlement_list.html'
 
     extra_roles = ['finance']
