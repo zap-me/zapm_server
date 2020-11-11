@@ -460,6 +460,16 @@ class FilterUserMerchantName(BaseSQLAFilter):
         # Without this we need to restart the server to update the cache of device names.
         return ReloadingIterator(get_merchant_names)
 
+class FilterBoolean(BaseSQLAFilter):
+    def apply(self, query, value, alias=None):
+        return query.filter(self.get_column(alias) == value)
+ 
+    def operation(self):
+        return lazy_gettext('equals')
+
+    def get_options(self, view):
+        return [(True, 'True'), (False, 'False')]
+
 class FilterEqual(BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(self.get_column(alias) == value)
@@ -671,7 +681,7 @@ class UserModelView(RestrictedModelView):
 
     column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'active']
     column_formatters = dict(wallet_address=_format_address_column)
-    column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email') ]
+    column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email'), FilterBoolean(User.active, 'Filter Active') ]
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
