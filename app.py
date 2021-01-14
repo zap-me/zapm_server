@@ -14,7 +14,7 @@ from flask_security import current_user
 from app_core import app, db, socketio, aw
 from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 import admin
-from utils import check_hmac_auth, generate_key, apply_merchant_rate
+from utils import check_hmac_auth, generate_key, apply_customer_rate, apply_merchant_rate
 import bnz_ib4b
 
 logger = logging.getLogger(__name__)
@@ -338,6 +338,23 @@ def rates():
     customer_rate = api_key.user.customer_rate if api_key.user.customer_rate else app.config["CUSTOMER_RATE"]
     rates = {"settlement_fee": str(settlement_fee), "merchant": str(merchant_rate), "customer": str(customer_rate), "settlement_address": app.config["SETTLEMENT_ADDRESS"], "sales_tax": str(app.config["SALES_TAX"])}
     return jsonify(rates)
+
+def _zap_calc(api_key, nzd_required):
+    zap = apply_customer_rate(nzd_required, api_key.user, app.config)
+    return int(zap)
+
+@app.route("/zap_calc", methods=["POST"])
+def zap_calc():
+    sig = request.headers.get("X-Signature")
+    content = request.json
+    api_key = content["api_key"]
+    nonce = content["nonce"]
+    nzd_required = content["nzd_required"]
+    res, reason, api_key = check_auth(api_key, nonce, sig, request.data)
+    if not res:
+        return bad_request(reason)
+    zap = _zap_calc(api_key, nzd_required)
+    return jsonify(dict(nzd_required=nzd_required, zap=zap))
 
 @app.route("/banks", methods=["POST"])
 def banks():

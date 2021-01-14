@@ -81,6 +81,19 @@ def blockchain_transactions(logger, node, wallet_address, limit, after=None):
         txs_result.append(tx)
     return txs_result
 
+def apply_customer_rate(nzd, user, config):
+    print('nzd: ' + str(nzd))
+    sales_tax = config["SALES_TAX"]
+    print('sales_tax: ' + str(sales_tax))
+    customer_rate = user.customer_rate if user.customer_rate else config["CUSTOMER_RATE"]
+    merchant_fee = (nzd * (1 + customer_rate)) - nzd
+    print('merchant_fee: ' + str(merchant_fee))
+    merchant_fee = merchant_fee * (1 + sales_tax)
+    print('merchant_fee (inc tax): ' + str(merchant_fee))
+    zap = nzd + merchant_fee
+    print('zap: ' + str(zap))
+    return zap
+
 def apply_merchant_rate(amount, user, config, use_fixed_fee=True):
     print('amount: ' + str(amount))
     sales_tax = config["SALES_TAX"]
