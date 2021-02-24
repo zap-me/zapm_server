@@ -660,8 +660,9 @@ class UserModelView(RestrictedModelView):
             return ''
         node_url = app.config["NODE_ADDRESS"]
         asset_id = app.config["ASSET_ID"]
+        explorer_url = app.config["BLOCKCHAIN_EXPLORER"]
         html = '''
-            {address}
+            <a href="{explorer_url}/address/{address}/tx">{address}</a>
             <span id="{address}-balance"></span>
             <script>
                 var xhr = new XMLHttpRequest();
@@ -676,12 +677,25 @@ class UserModelView(RestrictedModelView):
                 xhr.open("GET", url, true);
                 xhr.send();
             </script>
-        '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id)
+        '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id, explorer_url=explorer_url)
         return Markup(html)
 
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'active']
-    column_formatters = dict(wallet_address=_format_address_column)
+    def _format_address_column_export(view, context, model, name):
+        if not model.wallet_address:
+            return Markup('-')
+        return Markup(model.wallet_address)
+
+    def _format_bank_account(view, context, model, name):
+        bank_account_number=model.banks.first()
+        if bank_account_number:
+            return Markup(bank_account_number)
+        return Markup('-')
+
+    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'active', 'bank_account_number']
+    column_formatters = dict(wallet_address=_format_address_column, bank_account_number=_format_bank_account)
     column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email'), FilterBoolean(User.active, 'Filter Active') ]
+    column_labels = {'bank_account_number': 'Bank AccountNumber(Active)'}
+    column_formatters_export = {'wallet_address': _format_address_column_export, 'bank_account_number': _format_bank_account}
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
@@ -689,6 +703,7 @@ class UserModelView(RestrictedModelView):
 
 class AdminUserModelView(UserModelView):
     can_create = True
+    can_export = True
     def is_accessible(self):
         return (current_user.has_role('admin'))
 
@@ -697,6 +712,7 @@ class AdminUserModelView(UserModelView):
 
 class FinanceUserModelView(UserModelView):
     can_create = True
+    can_export = True
     def is_accessible(self):
         return (current_user.has_role('finance'))
 
