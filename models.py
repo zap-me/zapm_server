@@ -655,14 +655,15 @@ class UserModelView(RestrictedModelView):
         if is_created:
             send_reset_password_instructions(model)
 
-    def _format_address_column(view, context, model, name):
+    def _format_information_column(view, context, model, name):
         if not model.wallet_address:
             return ''
         node_url = app.config["NODE_ADDRESS"]
         asset_id = app.config["ASSET_ID"]
         explorer_url = app.config["BLOCKCHAIN_EXPLORER"]
         html = '''
-            <a href="{explorer_url}/address/{address}/tx">{address}</a>
+            wallet address: <a href="{explorer_url}/address/{address}/tx">{address}</a>
+            wallet balance:
             <span id="{address}-balance"></span>
             <script>
                 var xhr = new XMLHttpRequest();
@@ -676,8 +677,9 @@ class UserModelView(RestrictedModelView):
                 }};
                 xhr.open("GET", url, true);
                 xhr.send();
-            </script>
-        '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id, explorer_url=explorer_url)
+            </script><br/>
+            bank account number: {bank_account_number}
+        '''.format(address=model.wallet_address, node_url=node_url, asset_id=asset_id, explorer_url=explorer_url, bank_account_number=model.banks.first())
         return Markup(html)
 
     def _format_address_column_export(view, context, model, name):
@@ -691,11 +693,13 @@ class UserModelView(RestrictedModelView):
             return Markup(bank_account_number)
         return Markup('-')
 
-    column_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'active', 'bank_account_number']
-    column_formatters = dict(wallet_address=_format_address_column, bank_account_number=_format_bank_account)
+    column_list = ['merchant_name', 'email', 'roles', 'active', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'information']
+    column_formatters = dict(information=_format_information_column, bank_account_number=_format_bank_account)
     column_filters = [ FilterStartsWithInsensitive(User.merchant_name, 'Search Merchant Name'), FilterStartsWithInsensitive(User.email, 'Search Email'), FilterBoolean(User.active, 'Filter Active') ]
     column_labels = {'bank_account_number': 'Bank AccountNumber(Active)'}
     column_formatters_export = {'wallet_address': _format_address_column_export, 'bank_account_number': _format_bank_account}
+    column_details_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'active', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'bank_account_number']
+    column_export_list = ['merchant_name', 'merchant_code', 'email', 'roles', 'active', 'confirmed_at', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'wallet_address', 'bank_account_number']
     form_args = dict(
         email=dict(validators=[DataRequired(), validate_email_address]),
         merchant_name=dict(validators=[DataRequired()])
@@ -704,6 +708,7 @@ class UserModelView(RestrictedModelView):
 class AdminUserModelView(UserModelView):
     can_create = True
     can_export = True
+    can_view_details = True
     def is_accessible(self):
         return (current_user.has_role('admin'))
 
@@ -713,6 +718,7 @@ class AdminUserModelView(UserModelView):
 class FinanceUserModelView(UserModelView):
     can_create = True
     can_export = True
+    can_view_details = True
     def is_accessible(self):
         return (current_user.has_role('finance'))
 
