@@ -23,10 +23,12 @@ else:
 app.config["TESTNET"] = True
 app.config["ASSET_ID"] = "CgUrFtinLXEbJwJVjwwcppk4Vpz1nMmR3H5cQaDcUcfe"
 app.config["NODE_ADDRESS"] = "https://testnet1.wavesnodes.com"
+app.config["BLOCKCHAIN_EXPLORER"] = "https://testnet.wavesexplorer.com"
 if os.getenv("PRODUCTION"):
     app.config["TESTNET"] = False
     app.config["ASSET_ID"] = "9R3iLi4qGLVWKc16Tg98gmRvgg1usGEYd7SgC1W5D6HB"
     app.config["NODE_ADDRESS"] = "https://nodes.wavesnodes.com"
+    app.config["BLOCKCHAIN_EXPLORER"] = "https://wavesexplorer.com"
 if os.getenv("DATABASE_URL"):
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
