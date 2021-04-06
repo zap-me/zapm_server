@@ -36,4 +36,3 @@ def security_context_processor():
         h=admin_helpers,
         get_url=url_for
     )
-

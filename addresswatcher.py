@@ -19,12 +19,15 @@ class AddressWatcher(gevent.Greenlet):
             self.url_base = "https://api.wavesplatform.com/v0"
             self.asset_id = "9R3iLi4qGLVWKc16Tg98gmRvgg1usGEYd7SgC1W5D6HB"
 
+    def start_watching(self, transfer_tx_callback):
+        self.transfer_tx_callback = transfer_tx_callback
+        self.start()
+
     def _run(self):
         print("running AddressWatcher...")
         dt = datetime.datetime.utcnow()
         js_datestring = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         after = None
-        last = True
         while 1:
             # poll for more transactions
             url = self.url_base + "/transactions/transfer"
@@ -43,8 +46,6 @@ class AddressWatcher(gevent.Greenlet):
                             self.transfer_tx_callback(api_keys, tx)
                 if "lastCursor" in body:
                     after = body["lastCursor"]
-                if "isLastPage" in body:
-                    last = body["isLastPage"]
             else:
                 #TODO log error
                 print(r)
@@ -53,7 +54,7 @@ class AddressWatcher(gevent.Greenlet):
 
     def watch(self, address, api_key):
         if not address in self.addresses:
-            self.addresses[address] = api_keys = [] 
+            self.addresses[address] = api_keys = []
         else:
             api_keys = self.addresses[address]
         if api_key not in api_keys:

@@ -6,16 +6,14 @@ import json
 import time
 import requests
 
-from flask import url_for, redirect, render_template, request, abort, jsonify
+from flask import render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
-from flask_socketio import Namespace, emit, join_room, leave_room
 from flask_security import current_user
+from flask_socketio import Namespace, emit, join_room, leave_room
 
 from app_core import app, db, socketio, aw
-from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
-import admin
+from models import user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 from utils import check_hmac_auth, generate_key, apply_customer_rate, apply_merchant_rate
-import bnz_ib4b
 
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
@@ -90,16 +88,16 @@ def check_auth(api_key_token, nonce, sig, body):
     db.session.commit()
     return True, "", api_key
 
-def transfer_tx_callback(api_keys, tx):
-    txt = json.dumps(tx)
+def transfer_tx_callback(api_keys, txn):
+    txt = json.dumps(txn)
     print("transfer_tx_callback: tx %s" % txt)
     for api_key in api_keys:
         print("sending 'tx' event to room %s" % api_key)
         socketio.emit("tx", txt, json=True, room=api_key)
-        if not TxNotification.exists(db.session, tx["id"]):
+        if not TxNotification.exists(db.session, txn["id"]):
             print("adding to tx notification table")
             api_key = ApiKey.from_token(db.session, api_key)
-            txnoti = TxNotification(api_key.user, tx["id"])
+            txnoti = TxNotification(api_key.user, txn["id"])
             db.session.add(txnoti)
             db.session.commit()
 
@@ -125,20 +123,17 @@ def get_update_balance(wallet_address):
             wallet_balances[wallet_address] = (now, balance)
             # return new balance
             return balance
-        else:
-            # return cached balance
-            return balance
-    else:
-        # initial balance and timestamp
-        balance = get_balance(wallet_address)
-        wallet_balances[wallet_address] = (now, balance)
-        # return initial balance
+        # return cached balance
         return balance
+    # initial balance and timestamp
+    balance = get_balance(wallet_address)
+    wallet_balances[wallet_address] = (now, balance)
+    # return initial balance
+    return balance
 
 @app.before_first_request
 def start_address_watcher():
-    aw.transfer_tx_callback = transfer_tx_callback
-    aw.start()
+    aw.start_watching(transfer_tx_callback)
 
 def bad_request(message):
     response = jsonify({"message": message})
@@ -178,7 +173,7 @@ def test_claimcode(token):
     if not app.config["DEBUG"]:
         return abort(404)
     claim_code = ClaimCode.from_token(db.session, token)
-    for api_key in ws_api_keys.keys():
+    for api_key in ws_api_keys:
         print("sending claim code to %s" % api_key)
         socketio.emit("info", claim_code.to_json(), json=True, room=api_key)
     if claim_code:
@@ -206,25 +201,15 @@ def alert_claimed(claim_code):
         socketio.emit("claimed", claim_code.to_json(), json=True, room=apikey.token)
 
 class SocketIoNamespace(Namespace):
-    def trigger_event(self, event, sid, *args):
-        if sid not in self.server.environ:
-            # we don't have record of this client, ignore this event
-            return '', 400
-        app = self.server.environ[sid]['flask.app']
-        if "DEBUG_REQUESTS" in app.config:
-            with app.request_context(self.server.environ[sid]):
-                before_request_func()
-        return super(SocketIoNamespace, self).trigger_event(event, sid, *args)
-
-    def on_error(self, e):
-        print(e)
+    def on_error(self, err):
+        print(err)
 
     def on_connect(self):
         print("connect sid: %s" % request.sid)
 
     def on_auth(self, auth):
         # check auth
-        res, reason, api_key = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
+        res, _, _ = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
         if res:
             emit("info", "authenticated!")
             # join room and store user
@@ -250,7 +235,7 @@ socketio.on_namespace(SocketIoNamespace("/"))
 #
 
 @app.route("/watch", methods=["POST"])
-def watch():
+def watch_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -263,7 +248,7 @@ def watch():
     return "ok"
 
 @app.route("/register", methods=["POST"])
-def register():
+def register_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -279,7 +264,7 @@ def register():
     return jsonify(claim_code.to_json())
 
 @app.route("/check", methods=["POST"])
-def check():
+def check_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -294,7 +279,7 @@ def check():
     return abort(404)
 
 @app.route("/merchanttx", methods=["POST"])
-def merchanttx():
+def merchanttx_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -306,7 +291,7 @@ def merchanttx():
     return "ok"
 
 @app.route("/wallet_address", methods=["POST"])
-def wallet_address():
+def wallet_address_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -325,7 +310,7 @@ def wallet_address():
     return "ok"
 
 @app.route("/rates", methods=["POST"])
-def rates():
+def rates_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -344,7 +329,7 @@ def _zap_calc(api_key, nzd_required):
     return int(zap)
 
 @app.route("/zap_calc", methods=["POST"])
-def zap_calc():
+def zap_calc_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -357,7 +342,7 @@ def zap_calc():
     return jsonify(dict(nzd_required=nzd_required, zap=zap))
 
 @app.route("/banks", methods=["POST"])
-def banks():
+def banks_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -374,7 +359,7 @@ def _settlement_calc(api_key, amount):
     return int(amount_receive)
 
 @app.route("/settlement_calc", methods=["POST"])
-def settlement_calc():
+def settlement_calc_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -387,7 +372,7 @@ def settlement_calc():
     return jsonify({"amount": amount, "amount_receive": amount_receive})
 
 @app.route("/settlement", methods=["POST"])
-def settlement():
+def settlement_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -402,7 +387,7 @@ def settlement():
         return bad_request("invalid bank account")
     amount_receive = _settlement_calc(api_key, amount)
     if amount_receive <= 0:
-        return bad_request("Settlement amount less then or equal to 0");
+        return bad_request("Settlement amount less then or equal to 0")
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
     if count_this_month >= max_this_month:
@@ -413,7 +398,7 @@ def settlement():
     return jsonify(settlement.to_json())
 
 @app.route("/settlement_set_txid", methods=["POST"])
-def settlement_set_txid():
+def settlement_set_txid_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -441,7 +426,7 @@ def settlement_set_txid():
 #
 
 @app.route("/claim", methods=["POST"])
-def claim():
+def claim_ep():
     content = request.json
     token = content["token"]
     secret = content["secret"]
@@ -456,8 +441,7 @@ def claim():
             db.session.add(claim_code)
             db.session.commit()
             return jsonify(claim_code.to_json())
-        else:
-            return bad_request("already claimed")
+        return bad_request("already claimed")
     return abort(404)
 
 if __name__ == "__main__":
@@ -493,7 +477,7 @@ if __name__ == "__main__":
 
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
-        logger.info("binding to port: %d" % port)
+        logger.info("binding to port: %d", port)
         socketio.run(app, host="0.0.0.0", port=port)
         # stop addresswatcher
         if aw:
