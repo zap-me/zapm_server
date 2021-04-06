@@ -241,7 +241,7 @@ class ApiKey(db.Model):
 
     @classmethod
     def admin_exists(cls, session, user):
-        return session.query(cls).filter(cls.user == user, cls.account_admin == True).first()
+        return session.query(cls).filter(cls.user == user, cls.account_admin == True).first() # pylint: disable=singleton-comparison
 
     def __repr__(self):
         return "<ApiKey %r>" % (self.token)
@@ -531,7 +531,7 @@ def get_device_names():
 def get_categories():
     if has_app_context():
         if not hasattr(g, 'categories'):
-            query = db.session.query(MerchantTx.category.distinct().label('category')).filter(MerchantTx.user_id == current_user.id, MerchantTx.category != None)
+            query = db.session.query(MerchantTx.category.distinct().label('category')).filter(MerchantTx.user_id == current_user.id, MerchantTx.category != None) # pylint: disable=singleton-comparison
             g.categories = [row.category for row in query.all()]
         for category in g.categories:
             yield category, category
@@ -571,7 +571,7 @@ class FilterByDeviceName(BaseSQLAFilter):
         return ReloadingIterator(get_device_names)
 
 class FilterByCategory(BaseSQLAFilter):
-    def apply(self, query, value):
+    def apply(self, query, value, alias=None):
         return query.filter(MerchantTx.category == value)
 
     def operation(self):
@@ -583,7 +583,7 @@ class FilterByCategory(BaseSQLAFilter):
         return ReloadingIterator(get_categories)
 
 class FilterBySettlementStatus(BaseSQLAFilter):
-    def apply(self, query, value):
+    def apply(self, query, value, alias=None):
         return query.filter(Settlement.status == value)
 
     def operation(self):
@@ -616,7 +616,7 @@ class BaseOnlyUserOwnedModelView(BaseModelView):
         return self.session.query(self.model).filter(self.model.user==current_user)
 
     def get_count_query(self):
-        return self.session.query(db.func.count('*')).filter(self.model.user==current_user)
+        return self.session.query(db.func.count('*')).filter(self.model.user==current_user) # pylint: disable=no-member
 
 class RestrictedModelView(BaseModelView):
     can_create = False
@@ -795,7 +795,7 @@ class SettlementAdminModelView(RestrictedModelView):
             logger.error("settlement (%s) tx %s not found", settlement.token, settlement.txid)
             return None
         if tx["recipient"] != settlement.settlement_address:
-            logger.error("settlement (%s) tx recipient is not correct", settlement.token, tx["recipient"])
+            logger.error("settlement (%s) tx recipient (%s) is not correct", settlement.token, tx["recipient"])
             return False
         if tx["assetId"] != aw.asset_id:
             logger.error("settlement (%s) tx asset ID (%s) is not correct", settlement.token, tx["assetId"])

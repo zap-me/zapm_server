@@ -210,7 +210,7 @@ class SocketIoNamespace(Namespace):
 
     def on_auth(self, auth):
         # check auth
-        res, reason, api_key = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
+        res, _, _ = check_auth(auth["api_key"], auth["nonce"], auth["signature"], str(auth["nonce"]))
         if res:
             emit("info", "authenticated!")
             # join room and store user
@@ -442,8 +442,7 @@ def claim_ep():
             db.session.add(claim_code)
             db.session.commit()
             return jsonify(claim_code.to_json())
-        else:
-            return bad_request("already claimed")
+        return bad_request("already claimed")
     return abort(404)
 
 if __name__ == "__main__":
@@ -479,7 +478,7 @@ if __name__ == "__main__":
 
         # Bind to PORT if defined, otherwise default to 5000.
         port = int(os.environ.get("PORT", 5000))
-        logger.info("binding to port: %d" % port)
+        logger.info("binding to port: %d", port)
         socketio.run(app, host="0.0.0.0", port=port)
         # stop addresswatcher
         if aw:
