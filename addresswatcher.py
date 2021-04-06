@@ -24,7 +24,6 @@ class AddressWatcher(gevent.Greenlet):
         dt = datetime.datetime.utcnow()
         js_datestring = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         after = None
-        last = True
         while 1:
             # poll for more transactions
             url = self.url_base + "/transactions/transfer"
@@ -43,8 +42,6 @@ class AddressWatcher(gevent.Greenlet):
                             self.transfer_tx_callback(api_keys, tx)
                 if "lastCursor" in body:
                     after = body["lastCursor"]
-                if "isLastPage" in body:
-                    last = body["isLastPage"]
             else:
                 #TODO log error
                 print(r)
@@ -53,7 +50,7 @@ class AddressWatcher(gevent.Greenlet):
 
     def watch(self, address, api_key):
         if not address in self.addresses:
-            self.addresses[address] = api_keys = [] 
+            self.addresses[address] = api_keys = []
         else:
             api_keys = self.addresses[address]
         if api_key not in api_keys:

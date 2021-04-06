@@ -41,7 +41,7 @@ def bankaccount_is_valid(account):
     return bankaccount.is_valid(account)
 
 def ib4b_response(filename, settlements, sender_name, sender_bank_account):
-    # create output 
+    # create output
     output = io.StringIO()
     # process settlements
     txs = []

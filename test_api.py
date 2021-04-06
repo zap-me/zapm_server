@@ -100,16 +100,18 @@ def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
         r = requests.get(url)
     return r
 
-def check_request_status(r):
+def check_request_status(req):
     try:
-        r.raise_for_status()
+        req.raise_for_status()
     except Exception as e:
         print("::ERROR::")
-        print(str(r.status_code) + " - " + r.url)
-        print(r.text)
+        print(str(req.status_code) + " - " + req.url)
+        print(req.text)
         raise e
 
 def websocket(args):
+    # pylint: disable=unused-variable
+
     print(":: calling websocket..")
     # create auth data
     nonce = int(time.time())
@@ -201,7 +203,7 @@ def settlement_set_txid(args):
     check_request_status(r)
     print(r.text)
 
-if __name__ == "__main__":
+def run():
     # parse arguments
     parser = construct_parser()
     args = parser.parse_args()
@@ -236,3 +238,6 @@ if __name__ == "__main__":
 
     if function:
         function(args)
+
+if __name__ == "__main__":
+    run()

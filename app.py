@@ -90,16 +90,16 @@ def check_auth(api_key_token, nonce, sig, body):
     db.session.commit()
     return True, "", api_key
 
-def transfer_tx_callback(api_keys, tx):
-    txt = json.dumps(tx)
+def transfer_tx_callback(api_keys, txn):
+    txt = json.dumps(txn)
     print("transfer_tx_callback: tx %s" % txt)
     for api_key in api_keys:
         print("sending 'tx' event to room %s" % api_key)
         socketio.emit("tx", txt, json=True, room=api_key)
-        if not TxNotification.exists(db.session, tx["id"]):
+        if not TxNotification.exists(db.session, txn["id"]):
             print("adding to tx notification table")
             api_key = ApiKey.from_token(db.session, api_key)
-            txnoti = TxNotification(api_key.user, tx["id"])
+            txnoti = TxNotification(api_key.user, txn["id"])
             db.session.add(txnoti)
             db.session.commit()
 
@@ -125,15 +125,13 @@ def get_update_balance(wallet_address):
             wallet_balances[wallet_address] = (now, balance)
             # return new balance
             return balance
-        else:
-            # return cached balance
-            return balance
-    else:
-        # initial balance and timestamp
-        balance = get_balance(wallet_address)
-        wallet_balances[wallet_address] = (now, balance)
-        # return initial balance
+        # return cached balance
         return balance
+    # initial balance and timestamp
+    balance = get_balance(wallet_address)
+    wallet_balances[wallet_address] = (now, balance)
+    # return initial balance
+    return balance
 
 @app.before_first_request
 def start_address_watcher():
@@ -402,7 +400,7 @@ def settlement():
         return bad_request("invalid bank account")
     amount_receive = _settlement_calc(api_key, amount)
     if amount_receive <= 0:
-        return bad_request("Settlement amount less then or equal to 0");
+        return bad_request("Settlement amount less then or equal to 0")
     count_this_month = Settlement.count_this_month(db.session, api_key.user)
     max_this_month = api_key.user.max_settlements_per_month if api_key.user.max_settlements_per_month else 1
     if count_this_month >= max_this_month:
