@@ -133,8 +133,7 @@ def get_update_balance(wallet_address):
 
 @app.before_first_request
 def start_address_watcher():
-    aw.transfer_tx_callback = transfer_tx_callback
-    aw.start()
+    aw.start_watching(transfer_tx_callback)
 
 def bad_request(message):
     response = jsonify({"message": message})

@@ -19,6 +19,10 @@ class AddressWatcher(gevent.Greenlet):
             self.url_base = "https://api.wavesplatform.com/v0"
             self.asset_id = "9R3iLi4qGLVWKc16Tg98gmRvgg1usGEYd7SgC1W5D6HB"
 
+    def start_watching(self, transfer_tx_callback):
+        self.transfer_tx_callback = transfer_tx_callback
+        self.start()
+
     def _run(self):
         print("running AddressWatcher...")
         dt = datetime.datetime.utcnow()
