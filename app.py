@@ -6,16 +6,14 @@ import json
 import time
 import requests
 
-from flask import url_for, redirect, render_template, request, abort, jsonify
+from flask import render_template, request, abort, jsonify
 from flask_security.utils import encrypt_password
-from flask_socketio import Namespace, emit, join_room, leave_room
 from flask_security import current_user
+from flask_socketio import Namespace, emit, join_room, leave_room
 
 from app_core import app, db, socketio, aw
-from models import security, user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
-import admin
+from models import user_datastore, Role, User, Bank, ClaimCode, TxNotification, ApiKey, MerchantTx, Settlement
 from utils import check_hmac_auth, generate_key, apply_customer_rate, apply_merchant_rate
-import bnz_ib4b
 
 logger = logging.getLogger(__name__)
 ws_api_keys = {}
@@ -176,7 +174,7 @@ def test_claimcode(token):
     if not app.config["DEBUG"]:
         return abort(404)
     claim_code = ClaimCode.from_token(db.session, token)
-    for api_key in ws_api_keys.keys():
+    for api_key in ws_api_keys:
         print("sending claim code to %s" % api_key)
         socketio.emit("info", claim_code.to_json(), json=True, room=api_key)
     if claim_code:
@@ -208,9 +206,9 @@ class SocketIoNamespace(Namespace):
         if sid not in self.server.environ:
             # we don't have record of this client, ignore this event
             return '', 400
-        app = self.server.environ[sid]['flask.app']
-        if "DEBUG_REQUESTS" in app.config:
-            with app.request_context(self.server.environ[sid]):
+        app_ = self.server.environ[sid]['flask.app']
+        if "DEBUG_REQUESTS" in app_.config:
+            with app_.request_context(self.server.environ[sid]):
                 before_request_func()
         return super(SocketIoNamespace, self).trigger_event(event, sid, *args)
 
@@ -304,7 +302,7 @@ def merchanttx():
     return "ok"
 
 @app.route("/wallet_address", methods=["POST"])
-def wallet_address():
+def wallet_address_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]

@@ -1,5 +1,6 @@
+# pylint: disable=no-self-argument
+
 import datetime
-from datetime import timezone
 import decimal
 import logging
 import io
@@ -13,22 +14,20 @@ from flask_admin.babel import lazy_gettext
 from flask_admin.helpers import get_form_data
 from flask_admin.model import filters
 from flask_admin.contrib import sqla
-from flask_mail import Message
-from sqlalchemy import and_
 from flask_admin.contrib.sqla.filters import BaseSQLAFilter
-from wtforms import ValidationError
-from flask_security import Security, SQLAlchemyUserDatastore, \
-    UserMixin, RoleMixin, login_required, current_user
+from flask_security import Security, SQLAlchemyUserDatastore, UserMixin, RoleMixin, current_user
 from flask_security.utils import encrypt_password
 from flask_security.recoverable import send_reset_password_instructions
+from sqlalchemy import and_
+from wtforms import ValidationError
+from wtforms.validators import DataRequired
 from marshmallow import Schema, fields
 from markupsafe import Markup
 import base58
 import qrcode
 import qrcode.image.svg
-from wtforms.validators import DataRequired
 
-from app_core import app, db, aw, mail
+from app_core import app, db, aw
 from utils import generate_key, ib4b_response, bankaccount_is_valid, blockchain_transactions, apply_merchant_rate, is_email, generate_random_password
 
 logger = logging.getLogger(__name__)
@@ -52,7 +51,7 @@ class Role(db.Model, RoleMixin):
         return session.query(cls).filter(cls.name == name).first()
 
     def __str__(self):
-        return self.name
+        return f'{self.name}'
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -113,7 +112,7 @@ class Bank(db.Model):
     def __init__(self, token, account_number, account_name, account_holder_address, bank_name, default_account):
         self.account_number = account_number
         self.account_name = account_name
-        self.account_holder_address = acount_holder_address
+        self.account_holder_address = account_holder_address
         self.bank_name = bank_name
         self.default_account = default_account
         self.generate_defaults()
@@ -283,11 +282,11 @@ class MerchantTx(db.Model):
         self.attachment = attachment
         try:
             self.device_name = json.loads(attachment)['device_name']
-        except:
+        except: # pylint: disable=bare-except
             pass
         try:
             self.category = json.loads(attachment)['category']
-        except:
+        except: # pylint: disable=bare-except
             pass
 
     @classmethod
@@ -432,6 +431,7 @@ security = Security(app, user_datastore)
 
 class DateBetweenFilter(BaseSQLAFilter, filters.BaseDateBetweenFilter):
     def __init__(self, column, name, options=None, data_type=None):
+        # pylint: disable=super-with-arguments
         super(DateBetweenFilter, self).__init__(column,
                                                 name,
                                                 options,
@@ -451,7 +451,7 @@ class FilterStartsWithInsensitive(BaseSQLAFilter):
 class FilterUserMerchantName(BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.join(Settlement.user).filter(User.merchant_code == value)
- 
+
     def operation(self):
         return lazy_gettext('equals')
 
@@ -463,7 +463,7 @@ class FilterUserMerchantName(BaseSQLAFilter):
 class FilterBoolean(BaseSQLAFilter):
     def apply(self, query, value, alias=None):
         return query.filter(self.get_column(alias) == value)
- 
+
     def operation(self):
         return lazy_gettext('equals')
 
@@ -510,7 +510,8 @@ def _format_amount(view, context, model, name):
     if name == 'amount_receive':
         return Markup(model.amount_receive / 100)
     if name == 'amount_nzd':
-        return round((model.amount_nzd / 100),2)
+        return round((model.amount_nzd / 100), 2)
+    return None
 
 def get_merchant_names():
     if has_app_context():
@@ -549,6 +550,7 @@ def _format_direction(view, context, model, name):
         return Markup('out')
     elif model.direction == 1:
         return Markup('in')
+    return None
 
 class ReloadingIterator:
     def __init__(self, iterator_factory):
@@ -601,10 +603,10 @@ class BaseModelView(sqla.ModelView):
         if not self.is_accessible():
             if current_user.is_authenticated:
                 # permission denied
-                abort(403)
-            else:
-                # login
-                return redirect(url_for('security.login', next=request.url))
+                return abort(403)
+            # login
+            return redirect(url_for('security.login', next=request.url))
+        return None
 
 class BaseOnlyUserOwnedModelView(BaseModelView):
     def is_accessible(self):
@@ -710,7 +712,7 @@ class AdminUserModelView(UserModelView):
     can_export = True
     can_view_details = True
     def is_accessible(self):
-        return (current_user.has_role('admin'))
+        return current_user.has_role('admin')
 
     column_editable_list = ['merchant_name', 'roles', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'active']
     form_columns = ['roles', 'merchant_name', 'email']
@@ -720,7 +722,7 @@ class FinanceUserModelView(UserModelView):
     can_export = True
     can_view_details = True
     def is_accessible(self):
-        return (current_user.has_role('finance'))
+        return current_user.has_role('finance')
 
     column_editable_list = ['merchant_name', 'max_settlements_per_month', 'settlement_fee', 'merchant_rate', 'customer_rate', 'active']
     form_columns = ['merchant_name', 'email']
@@ -1010,7 +1012,7 @@ class ApiKeyModelView(BaseOnlyUserOwnedModelView):
     </div>
   </div>
 </div>''' % (model.token, svg)
-        
+
         link = '<a href="#" data-keyboard="true" data-toggle="modal" data-target="#modal_%s"><img src="/static/qrcode.svg"/></a>' % model.token
         html = '%s %s' % (modal, link)
         return Markup(html)

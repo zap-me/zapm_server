@@ -55,7 +55,10 @@ def write_txs(file, direct_debit_auth_code, sending_bank_account_number, sender_
     hash_total = hash_total_finalize(hash_total)
     write_footer_record(file, amount_total_cents, count, hash_total)
 
-if __name__ == "__main__":
+def run():
     txs = [("0201910003676004", 1050, "SENDER_REF1", "SENDER_CODE1", "CUST1", "CUST_REF1", "CUST_CODE1"), ("0201910003676004", 500, "SENDER_REF2", "SENDER_CODE2", "CUST2", "CUST_REF2", "CUST_CODE2")]
     with open("test.txt", "w") as f:
         write_txs(f, "", "0201910003676005", "test sender", txs)
+
+if __name__ == "__main__":
+    run()

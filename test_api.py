@@ -100,17 +100,18 @@ def req(endpoint, params=None, api_key_token=None, api_key_secret=None):
         r = requests.get(url)
     return r
 
-def check_request_status(req):
+def check_request_status(request):
     try:
-        req.raise_for_status()
+        request.raise_for_status()
     except Exception as e:
         print("::ERROR::")
-        print(str(req.status_code) + " - " + req.url)
-        print(req.text)
+        print(str(request.status_code) + " - " + request.url)
+        print(request.text)
         raise e
 
 def websocket(args):
     # pylint: disable=unused-variable
+    # pylint: disable=invalid-name
 
     print(":: calling websocket..")
     # create auth data

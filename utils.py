@@ -98,9 +98,9 @@ def apply_merchant_rate(amount, user, config, use_fixed_fee=True):
     print('amount: ' + str(amount))
     sales_tax = config["SALES_TAX"]
     print('sales_tax: ' + str(sales_tax))
-    settlement_fee = user.settlement_fee if user.settlement_fee != None else config["SETTLEMENT_FEE"]
+    settlement_fee = user.settlement_fee if user.settlement_fee is not None else config["SETTLEMENT_FEE"]
     print('settlement_fee: ' + str(settlement_fee))
-    merchant_rate = user.merchant_rate if user.merchant_rate != None else config["MERCHANT_RATE"]
+    merchant_rate = user.merchant_rate if user.merchant_rate is not None else config["MERCHANT_RATE"]
     print('merchant_rate: ' + str(merchant_rate))
     if use_fixed_fee:
         fixed_fee = int(settlement_fee * 100)
@@ -127,7 +127,7 @@ def apply_merchant_rate(amount, user, config, use_fixed_fee=True):
     return amount_nzd
 
 def is_email(email):
-    return re.match("[^@]+@[^@]+\.[^@]+", email)
+    return re.match("[^@]+@[^@]+\.[^@]+", email) # pylint: disable=anomalous-backslash-in-string
 
 def generate_random_password(length):
     password_characters = string.ascii_letters + string.digits + string.punctuation
