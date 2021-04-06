@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 
 from flask import redirect, url_for, request, abort, flash, has_app_context, g
 from flask_admin import expose
-from flask_admin.actions import action
 from flask_admin.babel import lazy_gettext
 from flask_admin.helpers import get_form_data
 from flask_admin.model import filters
@@ -548,11 +547,11 @@ def get_settlement_statuses():
 def _format_direction(view, context, model, name):
     if model.direction == 0:
         return Markup('out')
-    elif model.direction == 1:
+    if model.direction == 1:
         return Markup('in')
     return None
 
-class ReloadingIterator:
+class ReloadingIterator: # pylint: disable=too-few-public-methods
     def __init__(self, iterator_factory):
         self.iterator_factory = iterator_factory
 
@@ -793,30 +792,30 @@ class SettlementAdminModelView(RestrictedModelView):
             return None
         tx = aw.transfer_tx(settlement.txid)
         if not tx:
-            logger.error("settlement (%s) tx %s not found" % (settlement.token, settlement.txid))
+            logger.error("settlement (%s) tx %s not found", settlement.token, settlement.txid)
             return None
         if tx["recipient"] != settlement.settlement_address:
-            logger.error("settlement (%s) tx recipient is not correct" % (settlement.token, tx["recipient"]))
+            logger.error("settlement (%s) tx recipient is not correct", settlement.token, tx["recipient"])
             return False
         if tx["assetId"] != aw.asset_id:
+            logger.error("settlement (%s) tx asset ID (%s) is not correct", settlement.token, tx["assetId"])
             return False
-            logger.error("settlement (%s) tx asset ID (%s) is not correct" % (settlement.token, tx["assetId"]))
         amount = int(decimal.Decimal(tx["amount"]) * 100)
         if amount != settlement.amount:
-            logger.error("settlement (%s) tx amount (%d) is not correct" % (settlement.token, amount))
+            logger.error("settlement (%s) tx amount (%d) is not correct", settlement.token, amount)
             return False
         if not tx["attachment"]:
-            logger.error("settlement (%s) tx attachment is empty" % settlement.token)
+            logger.error("settlement (%s) tx attachment is empty", settlement.token)
             return False
         attachment = base58.b58decode(tx["attachment"]).decode("utf-8")
         found_token = attachment == settlement.token
         if not found_token:
             try:
                 found_token = json.loads(attachment)["msg"] == settlement.token
-            except:
+            except: # pylint: disable=bare-except
                 pass
         if not found_token:
-            logger.error("settlement (%s) tx attachment (%s) is not correct" % (settlement.token, attachment))
+            logger.error("settlement (%s) tx attachment (%s) is not correct", settlement.token, attachment)
             return False
         return True
 
@@ -845,7 +844,7 @@ class SettlementAdminModelView(RestrictedModelView):
         try:
             self.session.commit()
             flash('Settlement {settlement_id} set as sent_zap'.format(settlement_id=settlement_id))
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-except
             if not self.handle_view_exception(ex):
                 raise
             flash('Failed to set Settlement {settlement_id} as sent_zap'.format(settlement_id=settlement_id), 'error')
@@ -876,7 +875,7 @@ class SettlementAdminModelView(RestrictedModelView):
         try:
             self.session.commit()
             flash('Settlement {settlement_id} set as suspended'.format(settlement_id=settlement_id))
-        except Exception as ex:
+        except Exception as ex: # pylint: disable=broad-except
             if not self.handle_view_exception(ex):
                 raise
             flash('Failed to set Settlement {settlement_id} as suspended'.format(settlement_id=settlement_id), 'error')
@@ -888,7 +887,7 @@ class SettlementAdminModelView(RestrictedModelView):
         settlements = Settlement.all_sent_zap(db.session)
         for settlement in settlements:
             res = self.settlement_validated(settlement)
-            if res == None:
+            if res is None:
                 continue
             if res:
                 settlement.status = Settlement.STATE_VALIDATED

@@ -202,18 +202,8 @@ def alert_claimed(claim_code):
         socketio.emit("claimed", claim_code.to_json(), json=True, room=apikey.token)
 
 class SocketIoNamespace(Namespace):
-    def trigger_event(self, event, sid, *args):
-        if sid not in self.server.environ:
-            # we don't have record of this client, ignore this event
-            return '', 400
-        app_ = self.server.environ[sid]['flask.app']
-        if "DEBUG_REQUESTS" in app_.config:
-            with app_.request_context(self.server.environ[sid]):
-                before_request_func()
-        return super(SocketIoNamespace, self).trigger_event(event, sid, *args)
-
-    def on_error(self, e):
-        print(e)
+    def on_error(self, err):
+        print(err)
 
     def on_connect(self):
         print("connect sid: %s" % request.sid)
@@ -246,7 +236,7 @@ socketio.on_namespace(SocketIoNamespace("/"))
 #
 
 @app.route("/watch", methods=["POST"])
-def watch():
+def watch_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -259,7 +249,7 @@ def watch():
     return "ok"
 
 @app.route("/register", methods=["POST"])
-def register():
+def register_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -275,7 +265,7 @@ def register():
     return jsonify(claim_code.to_json())
 
 @app.route("/check", methods=["POST"])
-def check():
+def check_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -290,7 +280,7 @@ def check():
     return abort(404)
 
 @app.route("/merchanttx", methods=["POST"])
-def merchanttx():
+def merchanttx_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -321,7 +311,7 @@ def wallet_address_ep():
     return "ok"
 
 @app.route("/rates", methods=["POST"])
-def rates():
+def rates_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -340,7 +330,7 @@ def _zap_calc(api_key, nzd_required):
     return int(zap)
 
 @app.route("/zap_calc", methods=["POST"])
-def zap_calc():
+def zap_calc_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -353,7 +343,7 @@ def zap_calc():
     return jsonify(dict(nzd_required=nzd_required, zap=zap))
 
 @app.route("/banks", methods=["POST"])
-def banks():
+def banks_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -370,7 +360,7 @@ def _settlement_calc(api_key, amount):
     return int(amount_receive)
 
 @app.route("/settlement_calc", methods=["POST"])
-def settlement_calc():
+def settlement_calc_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -383,7 +373,7 @@ def settlement_calc():
     return jsonify({"amount": amount, "amount_receive": amount_receive})
 
 @app.route("/settlement", methods=["POST"])
-def settlement():
+def settlement_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -409,7 +399,7 @@ def settlement():
     return jsonify(settlement.to_json())
 
 @app.route("/settlement_set_txid", methods=["POST"])
-def settlement_set_txid():
+def settlement_set_txid_ep():
     sig = request.headers.get("X-Signature")
     content = request.json
     api_key = content["api_key"]
@@ -437,7 +427,7 @@ def settlement_set_txid():
 #
 
 @app.route("/claim", methods=["POST"])
-def claim():
+def claim_ep():
     content = request.json
     token = content["token"]
     secret = content["secret"]
